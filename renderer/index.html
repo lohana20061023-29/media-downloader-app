@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="zh-CN">
+<meta charset="utf-8">
+<title>媒体下载</title>
+<style>
+  :root{
+    --bg:#f6f2ea; --card:#fff; --line:#d8e0ee; --ink:#16233a; --sub:#6b7d95;
+    --accent:#2464e8; --accent-soft:#e8efff;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);
+    font:14px/1.5 "Microsoft YaHei UI","Segoe UI",system-ui,sans-serif;
+    -webkit-user-select:none;user-select:none}
+  .wrap{max-width:620px;margin:0 auto;padding:18px 18px 96px}
+  .bar{display:flex;gap:8px;margin-bottom:14px}
+  input[type=text]{flex:1;min-width:0;padding:10px 12px;border:1px solid var(--line);
+    border-radius:10px;background:#fff;font-size:14px;outline:none;-webkit-user-select:text;user-select:text}
+  input[type=text]:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+  button{border:none;border-radius:10px;padding:10px 16px;font-size:14px;cursor:pointer;
+    background:var(--accent);color:#fff;font-weight:600}
+  button:disabled{opacity:.5;cursor:default}
+  button.ghost{background:#fff;border:1px solid var(--line);color:var(--ink);font-weight:500}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px;margin-bottom:12px}
+  .meta{display:flex;gap:12px}
+  .cover{width:112px;height:64px;border-radius:8px;object-fit:cover;background:#eef2f8;flex:0 0 auto}
+  .meta .t{font-weight:600;line-height:1.35;max-height:3.9em;overflow:hidden}
+  .meta .s{color:var(--sub);font-size:12px;margin-top:6px}
+  .sec{margin-top:12px}
+  .sec h4{margin:0 0 8px;font-size:12px;color:var(--sub);font-weight:600;display:flex;justify-content:space-between}
+  .opts{display:flex;flex-wrap:wrap;gap:8px}
+  .opt{border:1px solid var(--line);border-radius:9px;padding:7px 12px;background:#fff;cursor:pointer;font-size:13px}
+  .opt[data-on="1"]{border-color:var(--accent);background:var(--accent-soft);color:var(--accent);font-weight:600}
+  label.chk{display:inline-flex;align-items:center;gap:7px;cursor:pointer;font-size:13px}
+  .thumbs{display:flex;gap:8px;flex-wrap:wrap}
+  .thumb{width:84px;height:56px;border-radius:8px;object-fit:cover;border:2px solid transparent;cursor:pointer}
+  .thumb[data-on="1"]{border-color:var(--accent)}
+  .foot{position:fixed;left:0;right:0;bottom:0;background:#fff;border-top:1px solid var(--line);
+    padding:12px 18px;display:flex;align-items:center;gap:12px}
+  .foot .dir{flex:1;color:var(--sub);font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:pointer}
+  .jobs{margin-top:6px;font-size:12px;color:var(--sub)}
+  .job{display:flex;gap:8px;align-items:center;margin-top:6px}
+  .bar2{height:5px;border-radius:99px;background:#e8eef8;flex:1;overflow:hidden}
+  .bar2 i{display:block;height:100%;background:var(--accent);width:0}
+  .err{color:#c0392b;font-size:13px;margin-top:8px}
+  .empty{color:var(--sub);font-size:13px;text-align:center;padding:26px 0}
+</style>
+<div class="wrap">
+  <div class="bar">
+    <input id="url" type="text" placeholder="粘贴 B 站 / 抖音 / 小红书 / YouTube 链接，回车解析">
+    <button id="go">解析</button>
+  </div>
+  <div id="out"><div class="empty">粘一条链接开始</div></div>
+</div>
+<div class="foot">
+  <span class="dir" id="dir" title="">下载目录</span>
+  <button class="ghost" id="pick">选择…</button>
+  <button id="start" disabled>开始下载</button>
+</div>
+<script src="app.js"></script>
+</html>

@@ -1,0 +1,58 @@
+{
+  "name": "media-downloader-app",
+  "productName": "媒体下载",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "main.cjs",
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder --win"
+  },
+  "devDependencies": {
+    "electron": "33.2.0",
+    "electron-builder": "25.1.8"
+  },
+  "build": {
+    "appId": "com.lohana.media-downloader",
+    "productName": "MediaDownloader",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "main.cjs",
+      "preload.cjs",
+      "engine/**/*",
+      "renderer/**/*"
+    ],
+    "win": {
+      "target": [
+        "nsis"
+      ],
+      "icon": "renderer/icon.ico",
+      "executableName": "MediaDownloader",
+      "signAndEditExecutable": false
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "perMachine": false,
+      "shortcutName": "媒体下载"
+    },
+    "publish": {
+      "provider": "github",
+      "owner": "lohana20061023-29",
+      "repo": "media-downloader-app"
+    }
+  },
+  "files": [
+    "main.cjs",
+    "preload.cjs",
+    "engine/**/*",
+    "renderer/**/*"
+  ],
+  "dependencies": {
+    "electron-updater": "^6.8.11"
+  },
+  "description": "DSH 媒体下载的独立桌面版：B 站 / 抖音 / 小红书 / yt-dlp，粘链接即可下载"
+}
