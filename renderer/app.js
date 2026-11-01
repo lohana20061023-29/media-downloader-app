@@ -1,5 +1,5 @@
 /* 渲染进程：状态驱动的最小 UI，复用引擎返回的 info 结构 */
-let state = { info: null, pick: { videoQn: null, audio: true, audioId: null, audioMp3: false, coverIds: [], avatar: false }, busy: false, job: null, dir: '' };
+let state = { info: null, pick: { videoQn: null, audio: true, audioId: null, audioMp3: true, coverIds: [], avatar: false }, busy: false, job: null, dir: '' };
 const $ = (id) => document.getElementById(id);
 
 function h(tag, props = {}, ...kids) {
@@ -38,7 +38,7 @@ async function doProbe() {
   try {
     const info = await window.api.probe(url);
     state.info = info;
-    state.pick = { videoQn: info.videos?.[0]?.qn ?? null, audio: true, audioId: null, audioMp3: false, coverIds: [], avatar: false };
+    state.pick = { videoQn: info.videos?.[0]?.qn ?? null, audio: true, audioId: null, audioMp3: true, coverIds: [], avatar: false };
     render();
   } catch (e) {
     $('out').replaceChildren(h('div', { className: 'err' }, '解析失败：' + (e.message || e)));
@@ -69,16 +69,6 @@ function render() {
     ),
   ));
 
-  /* 作者头像预览（有头像才显示） */
-  if (info.up?.face) {
-    out.insertBefore(h('div', { className: 'card uprow' },
-      h('img', { className: 'face', src: info.up.face, referrerPolicy: 'no-referrer' }),
-      h('div', {},
-        h('div', { className: 'upname' }, info.up.name || '未知作者'),
-        h('div', { className: 'upsub' }, '作者头像可单独下载'),
-      ),
-    ), out.children[1] || null);
-  }
 
   /* 视频画质 */
   if (info.videos?.length) {
@@ -99,6 +89,12 @@ function render() {
       (() => { const i = h('input', { type: 'checkbox' }); i.checked = state.pick.audio; i.onchange = (e) => { state.pick.audio = e.target.checked; render(); }; return i; })(),
       '下载为额外音频文件');
     row.append(label);
+
+    const mp3 = h('label', { className: 'chk' },
+      (() => { const i = h('input', { type: 'checkbox' }); i.checked = state.pick.audioMp3; i.onchange = (e) => { state.pick.audioMp3 = e.target.checked; }; return i; })(),
+      '转成 MP3');
+    if (!state.pick.audio) mp3.style.opacity = '.45';
+    row.append(mp3);
     if (info.audios?.length) {
       const sel = h('select', {});
       for (const a of info.audios) { const o = h('option', { value: String(a.id) }, `${a.label || a.id} · ${Math.round((a.bandwidth || 0) / 1000)}kbps`); sel.append(o); }
@@ -110,7 +106,7 @@ function render() {
 
   /* 封面 / 头像 */
   if (info.covers?.length || info.images?.length || info.up?.face) {
-    const sec = h('div', { className: 'card sec' }, h('h4', {}, '封面 / 头像'));
+    const sec = h('div', { className: 'card sec' }, h('h4', {}, '封面 / 头像', h('span', {}, '点头像可单独下载')));
     const thumbs = h('div', { className: 'thumbs' });
     for (const c of info.covers || []) {
       const on = state.pick.coverIds.includes(c.id);
@@ -120,10 +116,15 @@ function render() {
       } }));
     }
     if (info.up?.face) {
-      const label = h('label', { className: 'chk' },
-        (() => { const i = h('input', { type: 'checkbox' }); i.checked = state.pick.avatar; i.onchange = (e) => { state.pick.avatar = e.target.checked; }; return i; })(),
-        '下载作者头像');
-      thumbs.append(label);
+      const on = state.pick.avatar;
+      const face = h('img', {
+        className: 'thumb face' + (on ? ' on' : ''),
+        src: info.up.face,
+        referrerPolicy: 'no-referrer',
+        title: '作者头像' + (on ? '（已选）' : '（点击选择）'),
+        onclick: () => { state.pick.avatar = !on; render(); },
+      });
+      thumbs.append(face);
     }
     sec.append(thumbs); out.append(sec);
   }

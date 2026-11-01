@@ -2,3 +2,4 @@
 dist/
 smoke.log*
 ui-*.png
+vendor/

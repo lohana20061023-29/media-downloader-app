@@ -34,6 +34,8 @@
   .thumbs{display:flex;gap:8px;flex-wrap:wrap}
   .thumb{width:84px;height:56px;border-radius:8px;object-fit:cover;border:2px solid transparent;cursor:pointer}
   .thumb[data-on="1"]{border-color:var(--accent)}
+  .thumb.face{border-radius:50%;width:56px;height:56px}
+  .thumb.face.on{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
   .foot{position:fixed;left:0;right:0;bottom:0;background:#fff;border-top:1px solid var(--line);
     padding:12px 18px;display:flex;align-items:center;gap:12px}
   .foot .dir{flex:1;color:var(--sub);font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:pointer}

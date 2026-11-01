@@ -1,7 +1,7 @@
 {
   "name": "media-downloader-app",
   "productName": "媒体下载",
-  "version": "0.1.5",
+  "version": "0.1.6",
   "private": true,
   "type": "module",
   "main": "main.cjs",
@@ -43,7 +43,16 @@
       "provider": "github",
       "owner": "lohana20061023-29",
       "repo": "media-downloader-app"
-    }
+    },
+    "extraResources": [
+      {
+        "from": "vendor",
+        "to": "vendor",
+        "filter": [
+          "ffmpeg.exe"
+        ]
+      }
+    ]
   },
   "files": [
     "main.cjs",

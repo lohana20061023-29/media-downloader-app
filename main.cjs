@@ -35,6 +35,12 @@ async function loadEngine() {
 
 const isDev = !app.isPackaged;
 
+/* 内置 ffmpeg：打包后在 resources/vendor 下，开发时在项目 vendor 下 */
+function bundledFfmpeg() {
+  const p = isDev ? join(__dirname, 'vendor', 'ffmpeg.exe') : join(process.resourcesPath, 'vendor', 'ffmpeg.exe');
+  return existsSync(p) ? p : '';
+}
+
 /* 登录：与 DSH 插件完全一致 —— 复用 lib/browser-login.mjs，
    启动系统浏览器（专用 profile）→ 用户在浏览器里登录 → 完成后把 Cookie
    写进 ~/.dsh/bili-dl/cookies.txt（插件用的同一个文件），
@@ -172,7 +178,7 @@ async function startDownload({ url, info, pick }) {
   const e = await loadEngine();
   applyCookies(e, url);
   const outDir = state.outDir;
-  const ffmpeg = await e.bili.findFfmpeg(state.ffmpeg);
+  const ffmpeg = await e.bili.findFfmpeg(bundledFfmpeg() || state.ffmpeg);
   const args = { url, outDir, ffmpeg, pick: pick || {} };
   const opts = { info, onUpdate: () => {} };
 
@@ -193,7 +199,7 @@ ipcMain.handle('bootstrap', async () => {
     copyToast: state.copyToast,
     proxy: state.proxy,
     version: app.getVersion(),
-    ffmpeg: await e.bili.findFfmpeg(state.ffmpeg).catch(() => null),
+    ffmpeg: await e.bili.findFfmpeg(bundledFfmpeg() || state.ffmpeg).catch(() => null),
     login: me,
     loginSites: await (async () => { try { return await e.browserLogin.detectLogins(); } catch { return {}; } })(),
   };
