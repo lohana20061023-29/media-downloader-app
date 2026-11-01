@@ -303,12 +303,34 @@ async function initAccounts(sites) {
     platformList = Object.entries(sites).map(([id, logged]) => ({ id, label: id, logged: !!logged }));
   }
 
+  /* 引擎后台轮询，检测到登录会把 Cookie 写进文件；不刷新面板就会一直显示「未登录」 */
+  if (window.api.onLoginSession) {
+    window.api.onLoginSession(async (d) => {
+      if (!d) return;
+      if (d.state === 'ok') {
+        await refreshAccounts();
+        $('accHint').textContent = '已检测到登录并保存 Cookie（' + (d.count || 0) + ' 条）';
+        sessionActive = false;
+        const cur = $('url').value.trim();
+        if (cur) doProbe();
+      } else if (d.state === 'closed') {
+        $('accHint').textContent = '登录窗口被关闭了；如果已经登录，请再点一次「打开登录」后点「完成登录」';
+      } else if (d.state === 'error') {
+        $('accHint').textContent = '登录检测出错：' + (d.message || '');
+      } else if (d.state === 'timeout') {
+        $('accHint').textContent = '等待超时（8 分钟）';
+      } else if (d.state === 'waiting') {
+        $('accHint').textContent = '窗口已打开，请在里面完成登录…';
+      }
+    });
+  }
+
   $('accFinish').onclick = async () => {
     const r = await window.api.finishSiteLogin();
     if (!r.ok) return alert('保存 Cookie 失败：' + r.error);
     sessionActive = false;
     await refreshAccounts();
-    $('accHint').textContent = '已保存 Cookie 到 ' + (r.cookieFile || 'cookies.txt');
+    $('accHint').textContent = '已保存 Cookie' + (r.count ? '（' + r.count + ' 条）' : '') + ' 到 ' + (r.cookieFile || 'cookies.txt');
     const cur = $('url').value.trim();
     if (cur) doProbe();
   };
