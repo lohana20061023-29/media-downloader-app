@@ -1,7 +1,7 @@
 {
   "name": "media-downloader-app",
   "productName": "媒体下载",
-  "version": "0.1.6",
+  "version": "0.1.7",
   "private": true,
   "type": "module",
   "main": "main.cjs",
@@ -61,7 +61,8 @@
     "renderer/**/*"
   ],
   "dependencies": {
-    "electron-updater": "^6.8.11"
+    "electron-updater": "^6.8.11",
+    "ws": "^8.22.0"
   },
   "description": "DSH 媒体下载的独立桌面版：B 站 / 抖音 / 小红书 / yt-dlp，粘链接即可下载"
 }

@@ -33,6 +33,10 @@ async function loadEngine() {
   return engine;
 }
 
+/* Electron 33 内置 Node 20 没有全局 WebSocket，而 browser-login 用它读浏览器 Cookie，
+   不补这一层会在登录窗口打开 2 秒后抛错并关掉窗口。 */
+try { globalThis.WebSocket = require('ws'); } catch (err) { console.error('WebSocket polyfill 失败', err); }
+
 const isDev = !app.isPackaged;
 
 /* 内置 ffmpeg：打包后在 resources/vendor 下，开发时在项目 vendor 下 */
@@ -237,6 +241,7 @@ ipcMain.handle('login-site-open', async (_e, key) => {
   const e = await loadEngine();
   try {
     await e.browserLogin.startLoginSession(key, (st) => {
+      try { require('node:fs').appendFileSync(require('node:path').join(require('node:os').tmpdir(), 'mediadl-login.log'), new Date().toISOString() + ' ' + key + ' ' + JSON.stringify(st) + '\n'); } catch {}
       if (mainWin) mainWin.webContents.send('login-session', { key, ...st });
     });
     return { ok: true };
