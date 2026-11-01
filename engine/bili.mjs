@@ -1,4 +1,4 @@
-/**
+﻿/**
  * B 站下载引擎。
  *
  * 一条链路走完：WBI 签名请求 → 取 DASH 流 → 带 Referer 下载 → ffmpeg 合流成 mp4。
@@ -333,6 +333,8 @@ export async function probe(input) {
     page, pageCount: view.pages?.length || 1,
     duration: pageInfo?.duration ?? view.duration,
     cover: view.pic,
+    desc: view.desc || '',
+    pubdate: view.pubdate || 0,
     up: { mid: view.owner?.mid, name: view.owner?.name, face: view.owner?.face },
     videos, audios,
     covers: buildCovers(view.pic),

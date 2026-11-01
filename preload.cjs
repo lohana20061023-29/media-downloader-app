@@ -8,6 +8,10 @@ contextBridge.exposeInMainWorld('api', {
   pickDir: () => ipcRenderer.invoke('pick-dir'),
   config: (patch) => ipcRenderer.invoke('config', patch),
   reveal: (p) => ipcRenderer.invoke('reveal', p),
+  loginStatus: () => ipcRenderer.invoke('login-status'),
+  loginQr: () => ipcRenderer.invoke('login-qr'),
+  loginPoll: (key) => ipcRenderer.invoke('login-poll', key),
+  logout: () => ipcRenderer.invoke('logout'),
   toastOpen: (url) => ipcRenderer.invoke('toast-open', url),
   onOpenUrl: (fn) => ipcRenderer.on('open-url', (_e, url) => fn(url)),
 });

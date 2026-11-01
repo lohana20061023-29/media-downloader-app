@@ -168,6 +168,7 @@ export async function douyinProbe(input) {
     source: 'douyin',
     bvid: '', aid: 0, cid: 0,
     title: item.desc || `抖音 ${id}`,
+    desc: item.desc || '',
     partTitle: '',
     page: 1, pageCount: 1,
     duration: Math.round((item.video?.duration || 0) / 1000) || 0,

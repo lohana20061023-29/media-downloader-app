@@ -7,13 +7,19 @@ const { join, dirname } = require('node:path');
 let engine = null;
 async function loadEngine() {
   if (engine) return engine;
-  const [bili, xhs, douyin, ytdlp] = await Promise.all([
+  const [bili, xhs, douyin, ytdlp, qr] = await Promise.all([
     import('./engine/bili.mjs'),
     import('./engine/xhs.mjs'),
     import('./engine/douyin.mjs'),
     import('./engine/ytdlp.mjs'),
+    import('./engine/qr.mjs'),
   ]);
-  engine = { bili, xhs, douyin, ytdlp };
+  engine = { bili, xhs, douyin, ytdlp, qr };
+  /* 应用自己保存的登录态优先；没有才借 DSH 插件那份 */
+  if (state.cookie) {
+    bili.setCookie(state.cookie);
+    return engine;
+  }
   /* 复用 DSH 插件的 B 站登录态（同一份 state.json），否则只能拿 480P */
   try {
     const { homedir } = require('node:os');
@@ -162,12 +168,14 @@ async function startDownload({ url, info, pick }) {
 /* ── IPC ─────────────────────────────────────────────── */
 ipcMain.handle('bootstrap', async () => {
   const e = await loadEngine();
+  const me = await e.bili.loginStatus().catch(() => ({ login: false, uname: '', face: '' }));
   return {
     outDir: state.outDir,
     copyToast: state.copyToast,
     proxy: state.proxy,
     version: app.getVersion(),
     ffmpeg: await e.bili.findFfmpeg(state.ffmpeg).catch(() => null),
+    login: me,
   };
 });
 
@@ -184,6 +192,38 @@ ipcMain.handle('job', async (_e, id) => {
   const e = await loadEngine();
   const job = e.bili.getJob(id);
   return job ? e.bili.publicJob(job) : null;
+});
+
+
+ipcMain.handle('login-status', async () => {
+  const e = await loadEngine();
+  try { return await e.bili.loginStatus(); } catch (err) { return { login: false, uname: '', face: '', error: err.message }; }
+});
+
+ipcMain.handle('login-qr', async () => {
+  const e = await loadEngine();
+  const { url, key } = await e.bili.qrGenerate();
+  const svg = e.qr.encodeQrSvg(url, { scale: 5, margin: 3 });
+  return { key, svg };
+});
+
+ipcMain.handle('login-poll', async (_e, key) => {
+  const e = await loadEngine();
+  const res = await e.bili.qrPoll(key);
+  if (res.state === 'ok' && res.cookie) {
+    e.bili.setCookie(res.cookie);
+    saveState({ cookie: res.cookie });
+    const me = await e.bili.loginStatus().catch(() => ({}));
+    return { state: 'ok', uname: me.uname || '' };
+  }
+  return res;
+});
+
+ipcMain.handle('logout', async () => {
+  const e = await loadEngine();
+  e.bili.setCookie('');
+  saveState({ cookie: '' });
+  return { ok: true };
 });
 
 ipcMain.handle('pick-dir', async () => {
