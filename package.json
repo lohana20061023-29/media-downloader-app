@@ -1,7 +1,7 @@
 {
-  "name": "media-downloader-app",
-  "productName": "媒体下载",
-  "version": "0.1.8",
+  "name": "lodown",
+  "productName": "LoDown",
+  "version": "0.2.0",
   "private": true,
   "type": "module",
   "main": "main.cjs",
@@ -15,7 +15,7 @@
   },
   "build": {
     "appId": "com.lohana.media-downloader",
-    "productName": "MediaDownloader",
+    "productName": "LoDown",
     "directories": {
       "output": "dist"
     },
@@ -30,14 +30,14 @@
         "nsis"
       ],
       "icon": "renderer/icon.ico",
-      "executableName": "MediaDownloader",
+      "executableName": "LoDown",
       "signAndEditExecutable": false
     },
     "nsis": {
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
       "perMachine": false,
-      "shortcutName": "媒体下载"
+      "shortcutName": "LoDown"
     },
     "publish": {
       "provider": "github",
@@ -64,5 +64,5 @@
     "electron-updater": "^6.8.11",
     "ws": "^8.22.0"
   },
-  "description": "DSH 媒体下载的独立桌面版：B 站 / 抖音 / 小红书 / yt-dlp，粘链接即可下载"
+  "description": "LoDown：B 站 / 抖音 / 小红书 / YouTube 等多平台下载器"
 }

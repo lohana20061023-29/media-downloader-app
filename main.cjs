@@ -61,7 +61,7 @@ function wireCookieConsumers(e) {
 
 /* ── 设置 ─────────────────────────────────────────────── */
 const stateFile = () => join(app.getPath('userData'), 'state.json');
-const DEFAULT_OUT = () => join(app.getPath('downloads'), '媒体下载');
+const DEFAULT_OUT = () => join(app.getPath('downloads'), 'LoDown');
 
 let state = { outDir: '', copyToast: true, proxy: '', ffmpeg: '' };
 function loadState() {
@@ -89,7 +89,7 @@ let tray = null;
 function createMain() {
   mainWin = new BrowserWindow({
     width: 620, height: 780, minWidth: 560, minHeight: 640,
-    title: '媒体下载', backgroundColor: '#f6f2ea', show: false,
+    title: 'LoDown', backgroundColor: '#f6f2ea', show: false,
     autoHideMenuBar: true,
     webPreferences: { preload: join(__dirname, 'preload.cjs'), contextIsolation: true, nodeIntegration: false },
   });
@@ -316,7 +316,7 @@ function createTray() {
   try {
     const icon = nativeImage.createFromPath(join(__dirname, 'renderer', 'icon.png'));
     tray = new Tray(icon.isEmpty() ? nativeImage.createEmpty() : icon);
-    tray.setToolTip('媒体下载');
+    tray.setToolTip('LoDown');
     tray.setContextMenu(Menu.buildFromTemplate([
       { label: '打开窗口', click: showMain },
       { type: 'separator' },
