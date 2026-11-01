@@ -36,9 +36,12 @@ DSH 媒体下载插件的独立版本：不用打开 DSH，粘一条链接就能
 
 ```bash
 pnpm install
-pnpm start        # 开发运行
+pnpm start        # 开发运行（会先解压内置 ffmpeg）
 pnpm dist         # 打包 NSIS 安装包
 ```
+
+> `vendor/ffmpeg-win64.zip`（37 MB）在仓库里，`scripts/prepare-ffmpeg.mjs` 会把它解成
+> `vendor/ffmpeg.exe`（100 MB，不进 git）。首次 `pnpm start` / `pnpm dist` 自动完成。
 
 引擎代码在 `engine/`，与 DSH 插件同源（`lib/*.mjs`），两边保持同步。
 

@@ -2,4 +2,6 @@
 dist/
 smoke.log*
 ui-*.png
-vendor/
+exe-icon-check.png
+vendor/*.exe
+vendor/*.zip

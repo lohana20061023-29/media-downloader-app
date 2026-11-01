@@ -6,8 +6,9 @@
   "type": "module",
   "main": "main.cjs",
   "scripts": {
-    "start": "electron .",
-    "dist": "electron-builder --win"
+    "prepare": "node scripts/prepare-ffmpeg.mjs",
+    "start": "node scripts/prepare-ffmpeg.mjs && electron .",
+    "dist": "node scripts/prepare-ffmpeg.mjs && electron-builder --win"
   },
   "devDependencies": {
     "electron": "33.2.0",
