@@ -243,45 +243,63 @@ $('loginClose').onclick = () => { $('loginModal').hidden = true; clearInterval(l
 $('qrBox').addEventListener('click', () => { if (!$('qrTip').textContent.includes('过期')) return; openLogin(); });
 
 
-/* ── 各平台登录（抖音 / X / YouTube / 小红书）──────────────── */
-const SITE_LABELS = { douyin: '抖音', x: 'X', youtube: 'YouTube', xhs: '小红书' };
-let siteState = {};
+/* ── 各平台登录（复用插件的 browser-login：打开系统浏览器登录）───── */
+let platformList = [];
+let sessionActive = false;
 
 function renderAccounts() {
   const box = $('accList');
   if (!box) return;
   box.replaceChildren();
-  for (const [id, label] of Object.entries(SITE_LABELS)) {
-    const has = !!siteState[id];
+  for (const p of platformList) {
     const row = h('div', { className: 'arow' },
-      h('span', { className: 'nm' }, label),
-      h('span', { className: 'st' + (has ? ' on' : '') }, has ? '已登录' : '未登录'),
+      h('span', { className: 'nm' }, p.label),
+      h('span', { className: 'st' + (p.logged ? ' on' : '') }, p.logged ? '已登录' : '未登录'),
     );
-    const btn = h('button', {}, has ? '重新登录' : '登录');
-    btn.onclick = () => window.api.openSiteLogin(id);
-    row.append(btn);
-    if (has) {
-      const clr = h('button', { className: 'ghost2' }, '清除');
-      clr.onclick = async () => {
-        await window.api.clearSiteLogin(id);
-        siteState[id] = false;
-        renderAccounts();
-      };
-      row.append(clr);
-    }
+    const open = h('button', {}, '打开登录');
+    open.onclick = async () => {
+      const r = await window.api.openSiteLogin(p.id);
+      if (!r.ok) return alert('打开失败：' + r.error);
+      sessionActive = true;
+      $('accHint').textContent = '已在浏览器中打开 ' + p.label + '，登录完成后回到这里点「完成登录」';
+    };
+    row.append(open);
     box.append(row);
   }
+  const spacer = h('div', { style: 'height:8px' });
+  box.append(spacer);
+}
+
+async function refreshAccounts() {
+  const r = await window.api.loginSites();
+  platformList = r.platforms || [];
+  renderAccounts();
+  if (r.cookieFile) $('accHint').textContent = 'Cookie 存于 ' + r.cookieFile + '（与 DSH 插件共用）';
 }
 
 async function initAccounts(sites) {
-  siteState = sites || {};
   const btn = $('accounts');
-  if (btn) btn.onclick = () => { $('accountsModal').hidden = false; renderAccounts(); };
-  const close = $('accClose');
-  if (close) close.onclick = () => { $('accountsModal').hidden = true; };
-  window.api.onSiteLoginResult((data) => {
-    if (data && data.ok) siteState[data.site] = true;
-    else alert('登录失败：' + ((data && data.error) || '未知原因'));
-    renderAccounts();
-  });
+  if (btn) btn.onclick = async () => { $('accountsModal').hidden = false; await refreshAccounts(); };
+  if ($('accClose')) $('accClose').onclick = () => { $('accountsModal').hidden = true; };
+
+  /* 打开面板时先按 bootstrap 的值填一遍 */
+  if (sites && typeof sites === 'object') {
+    platformList = Object.entries(sites).map(([id, logged]) => ({ id, label: id, logged: !!logged }));
+  }
+
+  $('accFinish').onclick = async () => {
+    const r = await window.api.finishSiteLogin();
+    if (!r.ok) return alert('保存 Cookie 失败：' + r.error);
+    sessionActive = false;
+    await refreshAccounts();
+    $('accHint').textContent = '已保存 Cookie 到 ' + (r.cookieFile || 'cookies.txt');
+    const cur = $('url').value.trim();
+    if (cur) doProbe();
+  };
+
+  $('accCancel').onclick = async () => {
+    await window.api.cancelSiteLogin();
+    sessionActive = false;
+    $('accHint').textContent = '已取消登录会话';
+  };
 }
