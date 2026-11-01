@@ -1,19 +1,19 @@
-import { existsSync, mkdirSync, statSync, createWriteStream, readFileSync } from 'node:fs';
+import { existsSync, mkdirSync, statSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { pipeline } from 'node:stream/promises';
-import { Readable } from 'node:stream';
 
 /* 准备内置 ffmpeg：
    1. vendor/ffmpeg.exe 已存在 → 直接用
    2. vendor/ffmpeg-win64.zip 存在 → 解开
-   3. 都没有 → 从本仓库 Release 附件下载压缩包（37 MB），再解开
-   exe 有 100 MB，超过 GitHub 单文件限制，所以仓库里只能存压缩包 / 附件。 */
+   3. 都没有 → 从本仓库 Release 附件下载（37 MB），再解开
+   有 HTTPS_PROXY 时走 curl（系统自带，能正确处理代理与 302）。
+   exe 有 100 MB，超过 GitHub 单文件限制，所以仓库里只放压缩包 / 附件。 */
 
 const REPO = 'lohana20061023-29/media-downloader-app';
 const TAG = 'v0.2.0';
 const URL = `https://github.com/${REPO}/releases/download/${TAG}/ffmpeg-win64.zip`;
+const PROXY = process.env.HTTPS_PROXY || process.env.HTTP_PROXY || process.env.https_proxy || process.env.http_proxy || '';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const vendor = join(root, 'vendor');
@@ -30,13 +30,17 @@ if (ok(exe)) {
 mkdirSync(vendor, { recursive: true });
 
 if (!existsSync(zip)) {
-  console.log('下载 ffmpeg 压缩包（37 MB）…');
-  const res = await fetch(URL, { redirect: 'follow', headers: { 'User-Agent': 'lodown-build' } });
-  if (!res.ok) {
-    console.error(`下载失败 HTTP ${res.status}，请手动放置 vendor/ffmpeg-win64.zip`);
+  console.log('下载 ffmpeg 压缩包（37 MB）…' + (PROXY ? '（经代理）' : ''));
+  const args = ['-L', '--fail', '--max-time', '1800'];
+  if (PROXY) args.push('-x', PROXY);
+  args.push('-o', zip, URL);
+  try {
+    execFileSync('curl.exe', args, { stdio: 'inherit' });
+  } catch {
+    console.error('下载失败；可手动把 ffmpeg-win64.zip 放到 vendor/ 下再重试');
     process.exit(1);
   }
-  await pipeline(Readable.fromWeb(res.body), createWriteStream(zip));
+  if (!existsSync(zip)) { console.error('没有生成 zip'); process.exit(1); }
   console.log('下载完成：' + (statSync(zip).size / 1024 / 1024).toFixed(1) + ' MB');
 }
 
