@@ -22,6 +22,7 @@ async function boot() {
   $('url').addEventListener('keydown', (e) => { if (e.key === 'Enter') doProbe(); });
   window.api.onOpenUrl((url) => { $('url').value = url; doProbe(); });
   initLogin(s.login);
+  initAccounts(s.loginSites);
 }
 
 async function pickDir() {
@@ -240,3 +241,47 @@ async function openLogin() {
 
 $('loginClose').onclick = () => { $('loginModal').hidden = true; clearInterval(loginTimer); };
 $('qrBox').addEventListener('click', () => { if (!$('qrTip').textContent.includes('过期')) return; openLogin(); });
+
+
+/* ── 各平台登录（抖音 / X / YouTube / 小红书）──────────────── */
+const SITE_LABELS = { douyin: '抖音', x: 'X', youtube: 'YouTube', xhs: '小红书' };
+let siteState = {};
+
+function renderAccounts() {
+  const box = $('accList');
+  if (!box) return;
+  box.replaceChildren();
+  for (const [id, label] of Object.entries(SITE_LABELS)) {
+    const has = !!siteState[id];
+    const row = h('div', { className: 'arow' },
+      h('span', { className: 'nm' }, label),
+      h('span', { className: 'st' + (has ? ' on' : '') }, has ? '已登录' : '未登录'),
+    );
+    const btn = h('button', {}, has ? '重新登录' : '登录');
+    btn.onclick = () => window.api.openSiteLogin(id);
+    row.append(btn);
+    if (has) {
+      const clr = h('button', { className: 'ghost2' }, '清除');
+      clr.onclick = async () => {
+        await window.api.clearSiteLogin(id);
+        siteState[id] = false;
+        renderAccounts();
+      };
+      row.append(clr);
+    }
+    box.append(row);
+  }
+}
+
+async function initAccounts(sites) {
+  siteState = sites || {};
+  const btn = $('accounts');
+  if (btn) btn.onclick = () => { $('accountsModal').hidden = false; renderAccounts(); };
+  const close = $('accClose');
+  if (close) close.onclick = () => { $('accountsModal').hidden = true; };
+  window.api.onSiteLoginResult((data) => {
+    if (data && data.ok) siteState[data.site] = true;
+    else alert('登录失败：' + ((data && data.error) || '未知原因'));
+    renderAccounts();
+  });
+}

@@ -12,7 +12,7 @@ import { join } from 'node:path';
 import { createJob, publicJob, imageExtFrom } from './bili.mjs';
 
 const UA_MOBILE = 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1';
-const COOKIE_FILE = join(homedir(), '.dsh', 'bili-dl', 'cookies.txt');
+const COOKIE_FILE = process.env.MEDIADL_COOKIE_FILE || join(homedir(), '.dsh', 'bili-dl', 'cookies.txt');
 
 export const looksLikeDouyin = (url) => /(^|\/\/)([a-z0-9-]+\.)?(douyin|iesdouyin)\.com\//i.test(String(url));
 
