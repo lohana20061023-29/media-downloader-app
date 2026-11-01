@@ -247,13 +247,27 @@ $('qrBox').addEventListener('click', () => { if (!$('qrTip').textContent.include
 let platformList = [];
 let sessionActive = false;
 
+const PLATFORM_NOTE = {
+  douyin: '解析无需登录（匿名 ttwid）',
+  xiaohongshu: '解析无需登录（浏览器读取）',
+  bilibili: '扫码登录，可选高画质',
+  youtube: '登录后可看会员 / 私享内容',
+  twitter: '登录后可看受保护内容',
+  tiktok: '登录后可看部分区域内容',
+  vimeo: '一般不需要登录',
+};
+
 function renderAccounts() {
   const box = $('accList');
   if (!box) return;
   box.replaceChildren();
   for (const p of platformList) {
+    const note = PLATFORM_NOTE[p.id];
     const row = h('div', { className: 'arow' },
-      h('span', { className: 'nm' }, p.label),
+      h('div', { className: 'nmbox' },
+        h('span', { className: 'nm' }, p.label),
+        note ? h('span', { className: 'note' }, note) : null,
+      ),
       h('span', { className: 'st' + (p.logged ? ' on' : '') }, p.logged ? '已登录' : '未登录'),
     );
     const open = h('button', {}, '打开登录');
@@ -274,6 +288,7 @@ async function refreshAccounts() {
   const r = await window.api.loginSites();
   platformList = r.platforms || [];
   renderAccounts();
+  $('accTop').textContent = '链接解析本身都不需要登录：抖音只用匿名 ttwid，小红书走浏览器读取。登录只影响需要账号的内容。';
   if (r.cookieFile) $('accHint').textContent = 'Cookie 存于 ' + r.cookieFile + '（与 DSH 插件共用）';
 }
 
