@@ -39,6 +39,9 @@ const isDev = !app.isPackaged;
    启动系统浏览器（专用 profile）→ 用户在浏览器里登录 → 完成后把 Cookie
    写进 ~/.dsh/bili-dl/cookies.txt（插件用的同一个文件），
    yt-dlp 走 --cookies，抖音走 MEDIADL_COOKIE_FILE。 */
+/* 只保留真正需要登录的平台：抖音/小红书解析靠匿名或浏览器，Vimeo 用不上 */
+const LOGIN_ALLOW = ['youtube', 'bilibili', 'twitter', 'tiktok'];
+
 function wireCookieConsumers(e) {
   try {
     e.ytdlp.setCookieOpts({ file: e.browserLogin.COOKIE_FILE, browser: '' });
@@ -217,7 +220,9 @@ ipcMain.handle('login-sites', async () => {
   let status = {};
   try { status = await e.browserLogin.detectLogins(); } catch { status = {}; }
   return {
-    platforms: Object.entries(e.browserLogin.PLATFORMS).map(([id, p]) => ({ id, label: p.label, logged: !!status[id] })),
+    platforms: Object.entries(e.browserLogin.PLATFORMS)
+      .filter(([id]) => LOGIN_ALLOW.includes(id))
+      .map(([id, p]) => ({ id, label: p.label, logged: !!status[id] })),
     cookieFile: e.browserLogin.COOKIE_FILE,
   };
 });
