@@ -34,23 +34,16 @@
   .thumbs{display:flex;gap:8px;flex-wrap:wrap}
   .thumb{width:84px;height:56px;border-radius:8px;object-fit:cover;border:2px solid transparent;cursor:pointer}
   .thumb[data-on="1"]{border-color:var(--accent)}
-  .picks{display:flex;gap:12px;flex-wrap:wrap}
-  .pick{position:relative;width:132px;background:#fff;border-radius:10px;overflow:hidden;cursor:pointer;
-    border:2px solid transparent;box-shadow:0 0 0 1px var(--line)}
-  .pick img{display:block;width:100%;height:76px;object-fit:cover;background:#eef2f8}
-  .pick.round img{height:132px;border-radius:50%;object-fit:cover}
-  .pick .tick{position:absolute;top:6px;right:6px;width:18px;height:18px;border-radius:50%;
-    background:#fff;border:1.5px solid #bfcbdd;color:transparent;font-size:12px;line-height:15px;
-    text-align:center;font-weight:700;transition:background .12s,border-color .12s,color .12s}
-  .pick.on{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
-  .pick.on .tick{background:var(--accent);border-color:var(--accent);color:#fff}
-  .pick .cap{position:absolute;left:0;right:0;bottom:0;padding:3px 8px;font-size:11px;
-    color:#fff;background:linear-gradient(transparent,#0009);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-  .pick.round .cap{background:none;color:var(--sub);position:static;text-align:center;padding:4px 0}
-  .pick.round{width:96px;background:transparent;box-shadow:none;border:none;text-align:center}
-  .pick.round img{width:88px;height:88px;margin:0 auto;box-shadow:0 0 0 1px var(--line)}
-  .pick.round.on img{box-shadow:0 0 0 3px var(--accent-soft),0 0 0 2px var(--accent)}
-  .pick.round.on{box-shadow:none;border:none}
+  .picks{display:flex;gap:12px;flex-wrap:wrap;align-items:flex-start}
+  .pick{display:flex;flex-direction:column;align-items:center;gap:6px;cursor:pointer;background:none;border:none}
+  .pick .frame{border:2px solid var(--line);border-radius:8px;overflow:hidden;background:#fff;
+    transition:border-color .12s,box-shadow .12s}
+  .pick img{display:block;width:132px;height:76px;object-fit:cover;background:#eef2f8}
+  .pick.on .frame{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+  .pick .cap{font-size:11.5px;color:var(--sub);max-width:132px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .pick.on .cap{color:var(--accent);font-weight:600}
+  .pick.round .frame{border-radius:50%}
+  .pick.round img{width:76px;height:76px;border-radius:50%}
   .thumb.face.on{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
   .foot{position:fixed;left:0;right:0;bottom:0;background:#fff;border-top:1px solid var(--line);
     padding:12px 18px;display:flex;align-items:center;gap:12px}

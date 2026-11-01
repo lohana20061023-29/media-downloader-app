@@ -106,13 +106,14 @@ function render() {
 
   /* 封面 / 头像：统一用带勾选框的卡片，和头像一致的选中反馈 */
   if (info.covers?.length || info.images?.length || info.up?.face) {
-    const sec = h('div', { className: 'card sec' }, h('h4', {}, '封面 / 头像', h('span', {}, '点击选择，右上角打勾')));
+    const sec = h('div', { className: 'card sec' }, h('h4', {}, '封面 / 头像', h('span', {}, '点击选中')));
     const picks = h('div', { className: 'picks' });
 
     const pickCard = (url, on, caption, round, onToggle) => {
       const box = h('div', { className: 'pick' + (round ? ' round' : '') + (on ? ' on' : ''), title: caption + (on ? '（已选）' : '（点击选择）') },
-        h('img', { src: url, referrerPolicy: 'no-referrer', draggable: false }),
-        h('span', { className: 'tick' }, '✓'),
+        h('div', { className: 'frame' },
+          h('img', { src: url, referrerPolicy: 'no-referrer', draggable: false }),
+        ),
         h('span', { className: 'cap' }, caption),
       );
       box.onclick = () => { onToggle(); render(); };
