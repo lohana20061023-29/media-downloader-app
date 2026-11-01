@@ -104,29 +104,34 @@ function render() {
     sec.append(row); out.append(sec);
   }
 
-  /* 封面 / 头像 */
+  /* 封面 / 头像：统一用带勾选框的卡片，和头像一致的选中反馈 */
   if (info.covers?.length || info.images?.length || info.up?.face) {
-    const sec = h('div', { className: 'card sec' }, h('h4', {}, '封面 / 头像', h('span', {}, '点头像可单独下载')));
-    const thumbs = h('div', { className: 'thumbs' });
+    const sec = h('div', { className: 'card sec' }, h('h4', {}, '封面 / 头像', h('span', {}, '点击选择，右上角打勾')));
+    const picks = h('div', { className: 'picks' });
+
+    const pickCard = (url, on, caption, round, onToggle) => {
+      const box = h('div', { className: 'pick' + (round ? ' round' : '') + (on ? ' on' : ''), title: caption + (on ? '（已选）' : '（点击选择）') },
+        h('img', { src: url, referrerPolicy: 'no-referrer', draggable: false }),
+        h('span', { className: 'tick' }, '✓'),
+        h('span', { className: 'cap' }, caption),
+      );
+      box.onclick = () => { onToggle(); render(); };
+      return box;
+    };
+
     for (const c of info.covers || []) {
       const on = state.pick.coverIds.includes(c.id);
-      thumbs.append(h('img', { className: 'thumb', src: c.url, 'data-on': on ? '1' : '0', referrerPolicy: 'no-referrer', onclick: () => {
+      picks.append(pickCard(c.url, on, c.label || '封面', false, () => {
         state.pick.coverIds = on ? state.pick.coverIds.filter((x) => x !== c.id) : [...state.pick.coverIds, c.id];
-        render();
-      } }));
+      }));
     }
+
     if (info.up?.face) {
       const on = state.pick.avatar;
-      const face = h('img', {
-        className: 'thumb face' + (on ? ' on' : ''),
-        src: info.up.face,
-        referrerPolicy: 'no-referrer',
-        title: '作者头像' + (on ? '（已选）' : '（点击选择）'),
-        onclick: () => { state.pick.avatar = !on; render(); },
-      });
-      thumbs.append(face);
+      picks.append(pickCard(info.up.face, on, '作者头像', true, () => { state.pick.avatar = !on; }));
     }
-    sec.append(thumbs); out.append(sec);
+
+    sec.append(picks); out.append(sec);
   }
 
   /* 图文图片 */
