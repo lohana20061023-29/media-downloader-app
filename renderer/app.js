@@ -21,7 +21,6 @@ async function boot() {
   $('start').onclick = doStart;
   $('url').addEventListener('keydown', (e) => { if (e.key === 'Enter') doProbe(); });
   window.api.onOpenUrl((url) => { $('url').value = url; doProbe(); });
-  initLogin(s.login);
   initAccounts(s.loginSites);
 }
 
@@ -186,68 +185,6 @@ async function poll(id) {
 }
 
 boot();
-
-
-/* ── 登录 ─────────────────────────────────────────────── */
-let loginTimer = 0;
-
-function paintLogin(me) {
-  const btn = $('login');
-  if (!btn) return;
-  if (me && me.login) {
-    btn.textContent = me.uname || '已登录';
-    btn.classList.add('on');
-    btn.onclick = async () => {
-      if (!confirm('退出登录？')) return;
-      await window.api.logout();
-      paintLogin({ login: false });
-      $('out').replaceChildren(h('div', { className: 'empty' }, '已退出登录'));
-    };
-  } else {
-    btn.textContent = '登录 B 站';
-    btn.classList.remove('on');
-    btn.onclick = openLogin;
-  }
-}
-
-async function initLogin(me) {
-  paintLogin(me);
-  if (!me) {
-    const m = await window.api.loginStatus().catch(() => null);
-    if (m) paintLogin(m);
-  }
-}
-
-async function openLogin() {
-  const modal = $('loginModal');
-  modal.hidden = false;
-  $('qrBox').innerHTML = '<div class="empty">正在获取二维码…</div>';
-  $('qrTip').textContent = '';
-  try {
-    const { key, svg } = await window.api.loginQr();
-    $('qrBox').innerHTML = svg;
-    $('qrTip').textContent = '用 B 站手机客户端扫码';
-    clearInterval(loginTimer);
-    loginTimer = setInterval(async () => {
-      const r = await window.api.loginPoll(key).catch(() => ({ state: 'unknown' }));
-      if (r.state === 'scanned') $('qrTip').textContent = '已扫码，请在手机上确认';
-      else if (r.state === 'expired') { $('qrTip').textContent = '二维码已过期，点击刷新'; clearInterval(loginTimer); }
-      else if (r.state === 'ok') {
-        clearInterval(loginTimer);
-        $('loginModal').hidden = true;
-        paintLogin({ login: true, uname: r.uname });
-        const cur = $('url').value.trim();
-        if (cur) doProbe();
-      }
-    }, 1500);
-  } catch (e) {
-    $('qrBox').innerHTML = '';
-    $('qrTip').textContent = '二维码获取失败：' + (e.message || e);
-  }
-}
-
-$('loginClose').onclick = () => { $('loginModal').hidden = true; clearInterval(loginTimer); };
-$('qrBox').addEventListener('click', () => { if (!$('qrTip').textContent.includes('过期')) return; openLogin(); });
 
 
 /* ── 各平台登录（复用插件的 browser-login：打开系统浏览器登录）───── */
