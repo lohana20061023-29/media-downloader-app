@@ -371,5 +371,17 @@ app.whenReady().then(async () => {
   }
 });
 
+/* 网页里点开的链接（target=_blank / window.open）：拦下来交给渲染进程开新标签页，
+   不生成独立窗口。Electron 33 已经移除 webview 的 new-window 事件，只能在这里拦。 */
+app.on('web-contents-created', (_event, contents) => {
+  try {
+    if (contents.getType() !== 'webview') return;
+    contents.setWindowOpenHandler(({ url }) => {
+      if (/^https?:/i.test(url) && mainWin) mainWin.webContents.send('open-url', url);
+      return { action: 'deny' };
+    });
+  } catch (err) { console.error('window-open 拦截失败', err); }
+});
+
 app.on('window-all-closed', () => { /* 常驻托盘 */ });
 app.on('before-quit', () => { app.isQuitting = true; });

@@ -105,6 +105,13 @@ function newTab(url) {
   wv.className = 'view';
   wv.setAttribute('allowpopups', '');
   wv.setAttribute('src', 'about:blank');
+  /* 页面里点开的链接（target=_blank / window.open）→ 在本应用新标签页打开，不弹独立窗口 */
+  wv.addEventListener('new-window', (e) => {
+    if (e.url) {
+      e.preventDefault();
+      if (/^https?:/i.test(e.url)) { S.view = 'browse'; newTab(e.url); }
+    }
+  });
   wv.addEventListener('did-navigate', (e) => onNavigate(tab, e.url));
   wv.addEventListener('did-navigate-in-page', (e) => onNavigate(tab, e.url));
   wv.addEventListener('page-title-updated', () => {
