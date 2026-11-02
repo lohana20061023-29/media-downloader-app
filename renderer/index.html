@@ -130,6 +130,22 @@
   .lm .bar .sp{flex:1}
   .lm .bar .hint{color:var(--sub);font-size:12px}
   .lm webview{flex:1;border:0;background:#fff}
+  /* 下载按钮 + 分辨率下拉 */
+  .dlbar{display:flex;gap:6px;margin-bottom:10px}
+  .dlbar .main{flex:1;height:38px;display:flex;align-items:center;justify-content:center;gap:7px}
+  .dlbar .main svg{width:16px;height:16px;stroke:#fff;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+  .dlbar .caret{width:40px;height:38px;display:flex;align-items:center;justify-content:center;background:var(--accent);border-radius:9px;cursor:pointer;border:none}
+  .dlbar .caret svg{width:15px;height:15px;stroke:#fff;fill:none;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round;transition:transform .15s}
+  .dlbar .caret.open svg{transform:rotate(180deg)}
+  .menu{border:1px solid var(--line);border-radius:10px;overflow:hidden;margin-bottom:10px}
+  .mrow{display:flex;align-items:center;gap:8px;padding:9px 11px;font-size:12.5px;cursor:pointer;border-top:1px solid #eef2f8}
+  .mrow:first-child{border-top:none}
+  .mrow:hover{background:#f3f7fd}
+  .mrow.on{background:var(--accent-soft);color:var(--accent);font-weight:600}
+  .mrow .q{flex:1}
+  .mrow .sz{color:var(--sub);font-size:11.5px}
+  .mrow.on .sz{color:var(--accent)}
+  .mrow .tick{width:14px;text-align:center;color:var(--accent)}
 </style>
 
 <div class="app">

@@ -267,7 +267,7 @@ function renderSide() {
   box.hidden = !show;
   if (!show) return;
 
-  const head = h('div', { className: 'sideHead' }, '视频资源');
+  const head = h('div', { className: 'sideHead' }, '媒体资源');
   const close = h('span', { className: 'x', title: '关闭面板' }, '×');
   close.onclick = () => { tab.panelOpen = false; renderSide(); };
   head.append(close);
@@ -278,24 +278,55 @@ function renderSide() {
   if (!info) {
     box.append(h('div', { className: 'empty', style: 'padding:34px 0' },
       icon('M12 4v10m0 0l-4-4m4 4l4-4M5 18h14'),
-      h('div', {}, '正在读取这个页面的资源…'),
+      h('div', {}, '正在读取这个页面的媒体…'),
     ));
     return;
   }
   const pick = tab.pick;
   box.append(h('div', { style: 'font-size:12px;color:var(--sub);margin-bottom:10px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap' }, info.title || ''));
 
-  if (info.videos?.length) {
-    const opts = h('div', { className: 'opts' });
-    for (const v of info.videos) {
-      const on = pick.videoQn === v.qn;
-      const o = h('div', { className: 'opt' + (on ? ' on' : '') }, v.label || `${v.height}P`);
-      o.onclick = () => { pick.videoQn = on ? null : v.qn; renderSide(); };
-      opts.append(o);
-    }
-    box.append(h('div', { className: 'sec' }, h('h4', {}, '视频', h('span', {}, pick.videoQn ? '点一下取消' : '未选')), opts));
-  }
+  /* 默认选最高画质（info.videos 已按画质从高到低排好） */
+  const vlist = info.videos || [];
+  const cur = vlist.find((v) => v.qn === pick.videoQn) || vlist[0] || null;
 
+  if (vlist.length) {
+    const estSize = (v) => {
+      if (!v.bandwidth || !info.duration) return '';
+      const mb = (v.bandwidth * info.duration) / 8 / 1024 / 1024;
+      return mb >= 1024 ? (mb / 1024).toFixed(1) + ' GB' : Math.round(mb) + ' MB';
+    };
+
+    const bar = h('div', { className: 'dlbar' });
+    const dl = h('button', { className: 'main' }, icon('M12 4v10m0 0l-4-4m4 4l4-4M5 18h14'), cur ? '下载 ' + (cur.label || cur.height + 'P') : '下载');
+    dl.onclick = () => startDownload(tab);
+    const caret = h('button', { className: 'caret' + (tab.menuOpen ? ' open' : ''), title: '选择分辨率' });
+    caret.append(icon('M6 9l6 6 6-6'));
+    caret.onclick = () => {
+      tab.menuOpen = !tab.menuOpen;
+      if (tab.menuOpen) { tab.pick.videoQn = tab.pick.videoQn || vlist[0].qn; }
+      renderSide();
+    };
+    bar.append(dl, caret);
+    box.append(bar);
+
+    if (tab.menuOpen) {
+      const menu = h('div', { className: 'menu' });
+      for (const v of vlist) {
+        const on = pick.videoQn === v.qn;
+        const row = h('div', { className: 'mrow' + (on ? ' on' : '') },
+          h('span', { className: 'tick' }, on ? '✓' : ''),
+          h('span', { className: 'q' }, (v.label || v.height + 'P') + (v.codec ? ' · ' + v.codec : '') + (v.vip ? ' · 会员' : '')),
+          h('span', { className: 'sz' }, estSize(v)),
+        );
+        row.onclick = () => { pick.videoQn = v.qn; tab.menuOpen = false; renderSide(); };
+        menu.append(row);
+      }
+      box.append(menu);
+    }
+
+    box.append(h('div', { style: 'font-size:11.5px;color:var(--sub);margin:-4px 0 10px' },
+      cur ? '当前：' + (cur.label || cur.height + 'P') + (cur.codec ? ' · ' + cur.codec : '') : ''));
+  }
   if (info.audios?.length || info.videos?.length) {
     const a = h('input', { type: 'checkbox' }); a.checked = pick.audio;
     a.onchange = (e) => { pick.audio = e.target.checked; };
@@ -340,9 +371,6 @@ function renderSide() {
     box.append(h('div', { className: 'sec' }, h('h4', {}, `图文 · ${info.images.length} 张`), picks));
   }
 
-  const start = h('button', { style: 'width:100%' }, '开始下载');
-  start.onclick = () => startDownload(tab);
-  box.append(start);
 }
 
 /* ── 解析 ── */
