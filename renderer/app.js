@@ -70,7 +70,12 @@ async function boot() {
 
   for (const v of ['browse', 'downloads', 'history', 'settings']) $('nav-' + v).onclick = () => setView(v);
 
-  window.api.onOpenUrl((url) => navigate(normalize(url)));
+  /* 提示框点开 → 总是新开一个标签页，不覆盖当前页 */
+  window.api.onOpenUrl((url) => {
+    S.view = 'browse';
+    setView('browse', true);
+    newTab(normalize(url));
+  });
   window.api.onLoginSession((d) => {
     if (!d) return;
     if (d.state === 'ok') S.sessionHint = '已保存 Cookie（' + (d.count || 0) + ' 条）';
