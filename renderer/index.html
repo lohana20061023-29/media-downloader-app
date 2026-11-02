@@ -93,6 +93,10 @@
   .kv .k{width:80px;color:var(--sub);font-size:12.5px;flex:0 0 auto}
   .kv .v{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px}
   .err{color:var(--bad);font-size:12.5px;margin-top:8px}
+  .side .sideHead{display:flex;align-items:center;gap:8px;margin-bottom:10px;font-size:13px;font-weight:600}
+  .side .sideHead .n{color:var(--sub);font-weight:400;font-size:11.5px}
+  .side .sideHead .x{margin-left:auto;cursor:pointer;color:#9aa8bd;font-size:15px;line-height:1;padding:2px 4px;border-radius:6px}
+  .side .sideHead .x:hover{background:#eef3fb;color:var(--ink)}
 </style>
 
 <div class="app">
@@ -123,6 +127,7 @@
       <button class="nav" id="reload" title="刷新">⟳</button>
       <button class="nav" id="home" title="起始页">⌂</button>
       <input id="addr" type="text" placeholder="输入网址或搜索…" spellcheck="false">
+      <button class="nav" id="paneltoggle" title="视频资源面板">▤</button>
       <button class="dl" id="download" disabled>下载此页</button>
     </div>
 

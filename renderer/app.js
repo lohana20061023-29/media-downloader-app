@@ -1,4 +1,4 @@
-/* LoDown：真浏览器界面
+﻿/* LoDown：真浏览器界面
    浏览 = 内嵌 webview 打开原网页；历史 = 浏览记录；下载 = 分状态列表；
    支持站点在工具栏出现「下载此页」，解析结果在右侧栏选择。 */
 let S = {
@@ -16,6 +16,7 @@ let S = {
   sites: [],
   sessionHint: '',
   err: '',
+  panelOpen: true,          // 右侧资源面板（可关闭）
 };
 
 const $ = (id) => document.getElementById(id);
@@ -55,6 +56,11 @@ async function boot() {
   $('reload').onclick = () => { if (S.page === 'web') view()?.reload(); };
   $('home').onclick = goHome;
   $('download').onclick = () => beginParse(S.url);
+  $('paneltoggle').onclick = () => {
+    S.panelOpen = !S.panelOpen;
+    $('side').hidden = !S.panelOpen || S.page === 'home' || S.view !== 'browse';
+    if (S.panelOpen) renderSide();
+  };
 
   $('addr').addEventListener('keydown', (e) => {
     if (e.key !== 'Enter') return;
@@ -97,6 +103,8 @@ function goHome() {
   $('startpage').style.display = '';
   $('download').disabled = true;
   $('view').style.visibility = 'hidden';
+  S.info = null; S.err = ''; S.pick = null;
+  $('side').hidden = true;
   setView('browse');
 }
 
@@ -118,6 +126,22 @@ async function onNavigate(e) {
   $('download').disabled = !SUPPORTED.test(url);
   const title = (() => { try { return view().getTitle(); } catch { return ''; } })();
   S.history = await window.api.browseAdd({ url, title: title || url });
+
+  /* 支持的站点：自动解析并打开资源面板 */
+  if (SUPPORTED.test(url)) {
+    S.info = null;
+    S.err = '';
+    S.panelOpen = true;
+    $('side').hidden = false;
+    clearTimeout(S.autoTimer);
+    S.autoTimer = setTimeout(() => beginParse(url, true), 1200);
+  } else {
+    S.info = null;
+    S.err = '';
+    S.panelOpen = true;
+    $('side').hidden = S.page === 'home';
+    renderSide();
+  }
 }
 
 /* ── 视图切换 ── */
@@ -129,7 +153,7 @@ function setView(v) {
   $('toolbar').style.display = isBrowse ? '' : 'none';
   $('workspace').hidden = !isBrowse;     // 非浏览时整块收起，page 才能占满
   $('page').hidden = isBrowse;
-  $('side').hidden = false;              // 侧栏常驻
+  $('side').hidden = v !== 'browse' || S.page === 'home' || !S.panelOpen;
 
   if (isBrowse) renderSide();            // 未解析时渲染占位
   else renderPage();
@@ -277,10 +301,9 @@ function renderSettings(box) {
 }
 
 /* ── 解析与下载 ── */
-async function beginParse(url) {
+async function beginParse(url, auto) {
   const dl = $('download');
-  dl.disabled = true;
-  dl.textContent = '解析中…';
+  if (!auto) { dl.disabled = true; dl.textContent = '解析中…'; }
   try {
     const info = await window.api.probe(url);
     S.info = info;
@@ -304,20 +327,25 @@ async function beginParse(url) {
 function renderSide() {
   const box = $('side');
   box.replaceChildren();
+  box.hidden = !S.panelOpen || S.page === 'home' || S.view !== 'browse';
+
+  const head = h('div', { className: 'sideHead' }, '视频资源');
+  const close = h('span', { className: 'x', title: '关闭面板' }, '×');
+  close.onclick = () => { S.panelOpen = false; renderSide(); };
+  head.append(close);
+  box.append(head);
 
   if (S.err) { box.append(h('div', { className: 'err' }, '解析失败：' + S.err)); return; }
   const info = S.info;
   if (!info) {
-    box.append(h('div', { className: 'h1', style: 'font-size:14px' }, '下载内容'));
-    box.append(h('div', { className: 'empty', style: 'padding:38px 0' },
+    box.append(h('div', { className: 'empty', style: 'padding:34px 0' },
       icon('M12 4v10m0 0l-4-4m4 4l4-4M5 18h14'),
-      h('div', {}, '打开支持的站点后，点右上角「下载此页」'),
+      h('div', {}, S.page === 'home' ? '在地址栏打开链接开始' : '这个页面没有可下载的资源'),
     ));
     return;
   }
   const pick = S.pick;
 
-  box.append(h('div', { className: 'h1', style: 'font-size:14px' }, '下载内容'));
   box.append(h('div', { style: 'font-size:12px;color:var(--sub);margin:-6px 0 10px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap' }, info.title || ''));
 
   if (info.videos?.length) {
