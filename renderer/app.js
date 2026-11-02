@@ -60,7 +60,6 @@ async function boot() {
     t.panelOpen = !t.panelOpen;
     $('paneltoggle').classList.toggle('on', t.panelOpen);
     renderSide();
-    setTimeout(() => fitZoom(t), 60);
   };
 
   $('addr').addEventListener('keydown', (e) => {
@@ -84,8 +83,6 @@ async function boot() {
     else if (d.state === 'error') S.sessionHint = '登录检测出错：' + (d.message || '');
     if (S.view === 'settings') renderPage();
   });
-
-  window.addEventListener('resize', () => { clearTimeout(S.zoomTimer); S.zoomTimer = setTimeout(() => fitZoom(active()), 200); });
 
   activate(S.homeId);
   refreshSites();
@@ -116,8 +113,7 @@ function newTab(url) {
   });
   wv.addEventListener('dom-ready', () => {
     tab.ready = true;
-    setTimeout(() => fitZoom(tab), 300);
-    wv.addEventListener('did-finish-load', () => setTimeout(() => fitZoom(tab), 600));
+    try { wv.setZoomFactor(1); } catch {}
     if (tab.pendingUrl) { const u = tab.pendingUrl; tab.pendingUrl = ''; try { wv.loadURL(u); } catch {} }
   });
 
@@ -132,9 +128,6 @@ function newTab(url) {
 function activate(id) {
   S.activeId = id;
   for (const t of S.tabs) if (t.wv) t.wv.classList.toggle('on', t.id === id);
-
-  setTimeout(() => fitZoom(active()), 80);
-
   const isHome = id === S.homeId;
   $('startpage').style.display = isHome ? '' : 'none';
   $('download').disabled = isHome || !SUPPORTED.test(active()?.url || '');
@@ -208,7 +201,6 @@ async function onNavigate(tab, url) {
     $('download').disabled = !SUPPORTED.test(url);
   }
   renderTabs();
-  setTimeout(() => fitZoom(tab), 800);
   S.history = await window.api.browseAdd({ url, title: tab.title || url });
 
   if (SUPPORTED.test(url)) {
@@ -231,18 +223,16 @@ async function fitZoom(tab) {
     const avail = wv.getBoundingClientRect().width;
     if (!avail) return;
 
-    wv.setZoomFactor(1);
-    for (let i = 0; i < 3; i++) {
-      const { sw, vw } = await wv.executeJavaScript(
-        '({sw: Math.max(document.documentElement.scrollWidth, document.body ? document.body.scrollWidth : 0), vw: window.innerWidth})',
-      );
-      if (!sw || sw <= vw + 2) break;              // 没有横向溢出了
-      const cur = wv.getZoomFactor();
-      const next = Math.max(0.5, Math.min(1, (cur * avail) / sw));
-      if (Math.abs(next - cur) < 0.02) break;
-      wv.setZoomFactor(next);
-      await new Promise((r) => setTimeout(r, 120));
-    }
+    /* 在当前缩放比例下量一次版面宽度，直接算出目标比例：
+       zoom' = zoom * avail / scrollWidth，全程只改一次缩放，避免闪跳。 */
+    const sw = await wv.executeJavaScript(
+      'Math.max(document.documentElement.scrollWidth, document.body ? document.body.scrollWidth : 0)',
+    );
+    if (!sw || sw < 200) return;
+
+    const cur = wv.getZoomFactor();
+    const next = Math.max(0.5, Math.min(1, (cur * avail) / sw));
+    if (Math.abs(next - cur) > 0.01) wv.setZoomFactor(next);
   } catch { /* 页面没就绪就跳过 */ }
 }
 
@@ -469,7 +459,7 @@ function renderHistory(box) {
   const card = h('div', { className: 'card' });
   for (const it of S.history) {
     const open = h('span', { className: 'lnk' }, '打开');
-    open.onclick = () => navigate(it.url);
+    open.onclick = () => { setView('browse', true); newTab(it.url); };
     const del = h('span', { className: 'lnk', style: 'color:var(--sub)' }, '删除');
     del.onclick = async () => { S.history = await window.api.browseRemove(it.url); renderPage(); };
     card.append(h('div', { className: 'item' },
