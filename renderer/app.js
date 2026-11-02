@@ -59,6 +59,7 @@ async function boot() {
     const t = active();
     if (!t) return;
     t.panelOpen = !t.panelOpen;
+    $('paneltoggle').classList.toggle('on', t.panelOpen);
     renderSide();
   };
 
@@ -146,12 +147,25 @@ function renderTabs() {
   box.replaceChildren();
   box.hidden = S.view !== 'browse';
 
-  const home = h('div', { className: 'tab' + (S.activeId === S.homeId ? ' on' : '') }, h('span', { className: 't' }, '主页'));
+  const svg = (d) => {
+    const el = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    el.setAttribute('viewBox', '0 0 24 24');
+    const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    path.setAttribute('d', d);
+    el.append(path);
+    return el;
+  };
+
+  const home = h('div', { className: 'tab' + (S.activeId === S.homeId ? ' on' : '') },
+    svg('M4 10.5 12 4l8 6.5M6.5 9.5V20h11V9.5'),
+    h('span', { className: 't' }, '主页'),
+  );
   home.onclick = () => activate(S.homeId);
   box.append(home);
 
   for (const t of S.tabs) {
     const el = h('div', { className: 'tab' + (t.id === S.activeId ? ' on' : '') },
+      svg('M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18zM3 12h18M12 3c2.5 2.5 2.5 15 0 18M12 3c-2.5 2.5-2.5 15 0 18'),
       h('span', { className: 't' }, t.title || t.url || '新标签页'),
       (() => { const x = h('span', { className: 'x' }, '×'); x.onclick = (e) => { e.stopPropagation(); closeTab(t.id); }; return x; })(),
     );
