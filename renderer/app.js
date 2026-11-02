@@ -53,7 +53,6 @@ async function boot() {
   $('back').onclick = () => { const t = active(); try { t?.wv.goBack(); } catch {} };
   $('forward').onclick = () => { const t = active(); try { t?.wv.goForward(); } catch {} };
   $('reload').onclick = () => { const t = active(); try { t?.wv.reload(); } catch {} };
-  $('home').onclick = () => activate(S.homeId);
   $('download').onclick = () => { const t = active(); if (t?.url) parseTab(t, false); };
   $('paneltoggle').onclick = () => {
     const t = active();
