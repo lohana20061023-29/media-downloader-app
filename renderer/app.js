@@ -494,11 +494,7 @@ function renderSettings(box) {
   const acc = h('div', { className: 'card' });
   for (const p of S.sites) {
     const login = h('button', { className: 'ghost' }, '登录');
-    login.onclick = async () => {
-      const r = await window.api.openSiteLogin(p.id);
-      S.sessionHint = r.ok ? `已打开 ${p.label}，登录完点「完成登录」` : ('打开失败：' + r.error);
-      renderPage();
-    };
+    login.onclick = () => openInlineLogin(p.id, p.label);
     acc.append(h('div', { className: 'kv' },
       h('span', { className: 'k' }, p.label),
       h('span', { className: 'v', style: p.logged ? 'color:var(--ok);font-weight:600' : 'color:var(--sub)' }, p.logged ? '已登录' : '未登录'),
@@ -525,3 +521,39 @@ function renderSettings(box) {
 }
 
 boot();
+
+
+/* ── 内置登录窗口 ───────────────────────────────────── */
+let loginKey = '';
+
+async function openInlineLogin(key, label) {
+  const r = await window.api.loginInlineOpen(key);
+  if (!r.ok) { alert('无法打开登录：' + r.error); return; }
+  loginKey = key;
+  $('lmTitle').textContent = '登录 · ' + r.label;
+  $('lmHint').textContent = '在下方窗口完成登录，然后点「完成登录」';
+  const wv = $('lmView');
+  wv.setAttribute('partition', 'persist:login-' + key);
+  wv.setAttribute('src', r.url);
+  $('loginModal').hidden = false;
+}
+
+async function finishInlineLogin() {
+  if (!loginKey) return;
+  $('lmHint').textContent = '正在读取 Cookie…';
+  const r = await window.api.loginInlineFinish(loginKey);
+  if (!r.ok) { $('lmHint').textContent = '失败：' + r.error; return; }
+  $('loginModal').hidden = true;
+  S.sessionHint = '已保存 Cookie（' + r.count + ' 条）';
+  try { $('lmView').setAttribute('src', 'about:blank'); } catch {}
+  await refreshSites();
+  renderPage();
+}
+
+function closeInlineLogin() {
+  $('loginModal').hidden = true;
+  try { $('lmView').setAttribute('src', 'about:blank'); } catch {}
+}
+
+$('lmDone').onclick = finishInlineLogin;
+$('lmCancel').onclick = closeInlineLogin;

@@ -17,6 +17,8 @@ contextBridge.exposeInMainWorld('api', {
   historyRemove: (key) => ipcRenderer.invoke('history-remove', key),
   reveal: (p) => ipcRenderer.invoke('reveal', p),
   loginSites: () => ipcRenderer.invoke('login-sites'),
+  loginInlineOpen: (key) => ipcRenderer.invoke('login-inline-open', key),
+  loginInlineFinish: (key) => ipcRenderer.invoke('login-inline-finish', key),
   openSiteLogin: (site) => ipcRenderer.invoke('login-site-open', site),
   finishSiteLogin: () => ipcRenderer.invoke('login-site-finish'),
   cancelSiteLogin: () => ipcRenderer.invoke('login-site-cancel'),

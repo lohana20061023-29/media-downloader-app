@@ -225,6 +225,62 @@ ipcMain.handle('job', async (_e, id) => {
 });
 
 
+/* ── 内置登录：用应用内的 webview（独立 session）登录，完成后导出 Cookie ── */
+ipcMain.handle('login-inline-open', async (_e, key) => {
+  const e = await loadEngine();
+  const p = e.browserLogin.PLATFORMS[key];
+  if (!p) return { ok: false, error: '未知平台' };
+  return { ok: true, url: p.url, label: p.label };
+});
+
+ipcMain.handle('login-inline-finish', async (_e, key) => {
+  const e = await loadEngine();
+  const p = e.browserLogin.PLATFORMS[key];
+  if (!p) return { ok: false, error: '未知平台' };
+
+  const ses = session.fromPartition('persist:login-' + key);
+  let fetched = [];
+  for (const d of p.domains) {
+    try { fetched = fetched.concat(await ses.cookies.get({ domain: d })); } catch {}
+  }
+  const map = new Map();
+  for (const c of fetched) map.set(c.domain + '|' + c.name, c);
+  const list = [...map.values()];
+  if (!list.length) return { ok: false, error: '没有拿到 Cookie，确认已经登录了吗？' };
+
+  const hit = list.some((c) => p.check.includes(c.name));
+  if (!hit) return { ok: false, error: '还没检测到登录态（' + p.check.join(' / ') + '）' };
+
+  /* 合并写回 cookies.txt：先剔掉本平台旧行，再追加新的 */
+  const owns = (domain) => {
+    const d = String(domain || '').replace(/^\./, '').toLowerCase();
+    return p.domains.some((x) => d === x || d.endsWith('.' + x));
+  };
+  let rows = [];
+  try {
+    const txt = require('node:fs').readFileSync(e.browserLogin.COOKIE_FILE, 'utf8');
+    rows = txt.split(/\r?\n/).filter((l) => l && !l.startsWith('#') && !owns(l.split('\t')[0]));
+  } catch {}
+
+  const expires = (c) => (c.expirationDate ? Math.floor(c.expirationDate) : Math.floor(Date.now() / 1000) + 365 * 86400);
+  for (const c of list) {
+    const domain = c.domain.startsWith('.') ? c.domain : '.' + c.domain;
+    rows.push([domain, 'TRUE', '/', c.secure ? 'TRUE' : 'FALSE', expires(c), c.name, c.value].join('\t'));
+  }
+
+  try {
+    const path = require('node:path');
+    const fs = require('node:fs');
+    fs.mkdirSync(path.dirname(e.browserLogin.COOKIE_FILE), { recursive: true });
+    fs.writeFileSync(e.browserLogin.COOKIE_FILE, '# Netscape HTTP Cookie File\n' + rows.join('\n') + '\n', 'utf8');
+  } catch (err) {
+    return { ok: false, error: '写入失败：' + err.message };
+  }
+
+  try { e.browserLogin.cancelLoginSession(); } catch {}
+  return { ok: true, count: list.length };
+});
+
 ipcMain.handle('login-sites', async () => {
   const e = await loadEngine();
   let status = {};
