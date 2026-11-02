@@ -88,7 +88,7 @@ let tray = null;
 
 function createMain() {
   mainWin = new BrowserWindow({
-    width: 620, height: 780, minWidth: 560, minHeight: 640,
+    width: 1180, height: 820, minWidth: 1000, minHeight: 680,
     title: 'LoDown', backgroundColor: '#f6f2ea', show: false,
     autoHideMenuBar: true,
     webPreferences: { preload: join(__dirname, 'preload.cjs'), contextIsolation: true, nodeIntegration: false },
@@ -300,6 +300,21 @@ ipcMain.handle('pick-dir', async () => {
   if (res.canceled || !res.filePaths[0]) return { dir: '' };
   saveState({ outDir: res.filePaths[0] });
   return { dir: res.filePaths[0] };
+});
+
+/* ── 历史记录 ── */
+ipcMain.handle('history-list', () => Array.isArray(state.history) ? state.history : []);
+ipcMain.handle('history-add', (_e, item) => {
+  const list = Array.isArray(state.history) ? state.history : [];
+  const next = [item, ...list.filter((x) => !(x.url === item.url && x.kind === item.kind))].slice(0, 300);
+  saveState({ history: next });
+  return next;
+});
+ipcMain.handle('history-clear', () => { saveState({ history: [] }); return []; });
+ipcMain.handle('history-remove', (_e, key) => {
+  const list = (Array.isArray(state.history) ? state.history : []).filter((x) => x.key !== key);
+  saveState({ history: list });
+  return list;
 });
 
 ipcMain.handle('config', (_e, patch) => saveState(patch));
