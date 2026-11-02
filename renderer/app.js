@@ -60,6 +60,7 @@ async function boot() {
     t.panelOpen = !t.panelOpen;
     $('paneltoggle').classList.toggle('on', t.panelOpen);
     renderSide();
+    setTimeout(() => fitZoom(t), 60);
   };
 
   $('addr').addEventListener('keydown', (e) => {
@@ -83,6 +84,8 @@ async function boot() {
     else if (d.state === 'error') S.sessionHint = '登录检测出错：' + (d.message || '');
     if (S.view === 'settings') renderPage();
   });
+
+  window.addEventListener('resize', () => { clearTimeout(S.zoomTimer); S.zoomTimer = setTimeout(() => fitZoom(active()), 200); });
 
   activate(S.homeId);
   refreshSites();
@@ -113,6 +116,8 @@ function newTab(url) {
   });
   wv.addEventListener('dom-ready', () => {
     tab.ready = true;
+    setTimeout(() => fitZoom(tab), 300);
+    wv.addEventListener('did-finish-load', () => setTimeout(() => fitZoom(tab), 600));
     if (tab.pendingUrl) { const u = tab.pendingUrl; tab.pendingUrl = ''; try { wv.loadURL(u); } catch {} }
   });
 
@@ -127,6 +132,8 @@ function newTab(url) {
 function activate(id) {
   S.activeId = id;
   for (const t of S.tabs) if (t.wv) t.wv.classList.toggle('on', t.id === id);
+
+  setTimeout(() => fitZoom(active()), 80);
 
   const isHome = id === S.homeId;
   $('startpage').style.display = isHome ? '' : 'none';
@@ -201,6 +208,7 @@ async function onNavigate(tab, url) {
     $('download').disabled = !SUPPORTED.test(url);
   }
   renderTabs();
+  setTimeout(() => fitZoom(tab), 800);
   S.history = await window.api.browseAdd({ url, title: tab.title || url });
 
   if (SUPPORTED.test(url)) {
@@ -212,6 +220,30 @@ async function onNavigate(tab, url) {
     tab.info = null; tab.err = ''; tab.panelOpen = true;
     renderSide();
   }
+}
+
+/* 侧栏占位后，把网页缩放到「刚好完整显示」：
+   先复位到 1 量一次页面真实宽度，再按可用宽度算缩放比。 */
+async function fitZoom(tab) {
+  if (!tab || !tab.wv || !tab.ready) return;
+  const wv = tab.wv;
+  try {
+    const avail = wv.getBoundingClientRect().width;
+    if (!avail) return;
+
+    wv.setZoomFactor(1);
+    for (let i = 0; i < 3; i++) {
+      const { sw, vw } = await wv.executeJavaScript(
+        '({sw: Math.max(document.documentElement.scrollWidth, document.body ? document.body.scrollWidth : 0), vw: window.innerWidth})',
+      );
+      if (!sw || sw <= vw + 2) break;              // 没有横向溢出了
+      const cur = wv.getZoomFactor();
+      const next = Math.max(0.5, Math.min(1, (cur * avail) / sw));
+      if (Math.abs(next - cur) < 0.02) break;
+      wv.setZoomFactor(next);
+      await new Promise((r) => setTimeout(r, 120));
+    }
+  } catch { /* 页面没就绪就跳过 */ }
 }
 
 /* ── 视图 ── */
