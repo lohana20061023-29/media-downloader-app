@@ -24,6 +24,18 @@
 
   .main{flex:1;min-width:0;display:flex;flex-direction:column;position:relative}
 
+  .tabs{display:flex;align-items:flex-end;gap:4px;padding:6px 8px 0;background:#eef2f8;overflow-x:auto;flex:0 0 auto}
+  .tabs .tab{display:flex;align-items:center;gap:6px;max-width:220px;padding:7px 10px;border-radius:9px 9px 0 0;
+    background:#e2e8f2;color:var(--sub);font-size:12.5px;cursor:pointer;white-space:nowrap;flex:0 0 auto}
+  .tabs .tab.on{background:#fff;color:var(--ink);font-weight:600}
+  .tabs .tab .t{overflow:hidden;text-overflow:ellipsis;max-width:160px}
+  .tabs .tab .x{width:15px;height:15px;line-height:13px;text-align:center;border-radius:50%;color:#93a2b8}
+  .tabs .tab .x:hover{background:#cdd8e8;color:#3b4a60}
+  .tabs .add{background:none;border:none;color:var(--sub);font-size:16px;padding:2px 8px;cursor:pointer;border-radius:8px}
+  .tabs .add:hover{background:#e2e8f2;color:var(--ink)}
+  .views{position:absolute;inset:0}
+  .views webview{position:absolute;inset:0;width:100%;height:100%;border:0;background:#fff;visibility:hidden}
+  .views webview.on{visibility:visible}
   .toolbar{display:flex;gap:6px;align-items:center;padding:8px 10px;background:#fff;border-bottom:1px solid var(--line)}
   .toolbar button.nav{width:30px;height:30px;padding:0;background:none;color:var(--sub);border-radius:8px;font-size:15px}
   .toolbar button.nav:hover{background:#eef3fb;color:var(--ink)}
@@ -34,7 +46,7 @@
 
   .workspace{flex:1;min-height:0;display:flex}
   .workspace[hidden]{display:none}
-  .browse{flex:1;min-width:0;position:relative;display:flex}
+  .browse{flex:1;min-width:0;position:relative;display:flex}\n  .tabs[hidden]{display:none}
   webview{flex:1;border:0;background:#fff}
   .startpage{position:absolute;inset:0;background:var(--bg);display:flex;align-items:center;justify-content:center}
   .startpage .inner{text-align:center}
@@ -121,6 +133,7 @@
   </div>
 
   <div class="main">
+    <div class="tabs" id="tabs"></div>
     <div class="toolbar" id="toolbar">
       <button class="nav" id="back" title="后退">←</button>
       <button class="nav" id="forward" title="前进">→</button>
@@ -133,7 +146,7 @@
 
     <div class="workspace" id="workspace">
       <div class="browse" id="browseArea">
-        <webview id="view" src="about:blank"></webview>
+        <div class="views" id="views"></div>
         <div class="startpage" id="startpage">
           <div class="inner">
             <h1>LoDown</h1>
