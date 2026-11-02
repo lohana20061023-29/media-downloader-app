@@ -99,12 +99,13 @@
   .picks{display:flex;gap:9px;flex-wrap:wrap}
   .pick{display:flex;flex-direction:column;align-items:center;gap:4px;cursor:pointer}
   .pick .frame{border:2px solid var(--line);border-radius:8px;overflow:hidden;background:#fff}
-  .pick img{display:block;width:88px;height:50px;object-fit:cover;background:#eef2f8}
+  .pick img{display:block;width:112px;height:64px;object-fit:cover;background:#eef2f8}
   .pick.on .frame{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
   .pick .cap{font-size:10.5px;color:var(--sub)}
   .pick.on .cap{color:var(--accent);font-weight:600}
   .pick.round .frame{border-radius:50%}
-  .pick.round img{width:58px;height:58px;border-radius:50%}
+  .pick.round img{width:64px;height:64px;border-radius:50%}
+  .picks .pick.round{margin-left:auto}
 
   button{border:none;border-radius:9px;padding:9px 15px;font-size:13px;cursor:pointer;background:var(--accent);color:#fff;font-weight:600}
   button:disabled{opacity:.5;cursor:default}
