@@ -289,12 +289,25 @@ function renderSide() {
   const vlist = info.videos || [];
   const cur = vlist.find((v) => v.qn === pick.videoQn) || vlist[0] || null;
 
+  const estSize = (v) => {
+    if (!v.bandwidth || !info.duration) return '';
+    const mb = (v.bandwidth * info.duration) / 8 / 1024 / 1024;
+    return mb >= 1024 ? (mb / 1024).toFixed(1) + ' GB' : Math.round(mb) + ' MB';
+  };
+
   if (vlist.length) {
-    const estSize = (v) => {
-      if (!v.bandwidth || !info.duration) return '';
-      const mb = (v.bandwidth * info.duration) / 8 / 1024 / 1024;
-      return mb >= 1024 ? (mb / 1024).toFixed(1) + ' GB' : Math.round(mb) + ' MB';
-    };
+    /* 卡片：封面 + 标题 + 当前画质 + 下载按钮 + 下拉列表 */
+    const card = h('div', { className: 'mcard' });
+
+    const head = h('div', { className: 'mhead' },
+      info.cover ? h('img', { src: info.cover, referrerPolicy: 'no-referrer' }) : null,
+      h('div', { className: 'info' },
+        h('div', { className: 'tt' }, info.title || '（无标题）'),
+        h('div', { className: 'ss' },
+          cur ? '视频 ' + (cur.label || cur.height + 'P') + (cur.codec ? ' · ' + cur.codec : '') + (estSize(cur) ? ' · ' + estSize(cur) : '') : ''),
+      ),
+    );
+    card.append(head);
 
     const bar = h('div', { className: 'dlbar' });
     const dl = h('button', { className: 'main' }, icon('M12 4v10m0 0l-4-4m4 4l4-4M5 18h14'), cur ? '下载 ' + (cur.label || cur.height + 'P') : '下载');
@@ -303,11 +316,11 @@ function renderSide() {
     caret.append(icon('M6 9l6 6 6-6'));
     caret.onclick = () => {
       tab.menuOpen = !tab.menuOpen;
-      if (tab.menuOpen) { tab.pick.videoQn = tab.pick.videoQn || vlist[0].qn; }
+      if (tab.menuOpen && !tab.pick.videoQn) tab.pick.videoQn = vlist[0].qn;
       renderSide();
     };
     bar.append(dl, caret);
-    box.append(bar);
+    card.append(bar);
 
     if (tab.menuOpen) {
       const menu = h('div', { className: 'menu' });
@@ -321,12 +334,12 @@ function renderSide() {
         row.onclick = () => { pick.videoQn = v.qn; tab.menuOpen = false; renderSide(); };
         menu.append(row);
       }
-      box.append(menu);
+      card.append(menu);
     }
 
-    box.append(h('div', { style: 'font-size:11.5px;color:var(--sub);margin:-4px 0 10px' },
-      cur ? '当前：' + (cur.label || cur.height + 'P') + (cur.codec ? ' · ' + cur.codec : '') : ''));
+    box.append(card);
   }
+
   if (info.audios?.length || info.videos?.length) {
     const a = h('input', { type: 'checkbox' }); a.checked = pick.audio;
     a.onchange = (e) => { pick.audio = e.target.checked; };
