@@ -283,7 +283,6 @@ function renderSide() {
     return;
   }
   const pick = tab.pick;
-  box.append(h('div', { style: 'font-size:12px;color:var(--sub);margin-bottom:10px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap' }, info.title || ''));
 
   /* 默认选最高画质（info.videos 已按画质从高到低排好） */
   const vlist = info.videos || [];
@@ -299,12 +298,14 @@ function renderSide() {
     /* 卡片：封面 + 标题 + 当前画质 + 下载按钮 + 下拉列表 */
     const card = h('div', { className: 'mcard' });
 
+    card.append(h('h4', {}, '视频', h('span', {}, cur ? '当前 ' + (cur.label || cur.height + 'P') : '')));
+
     const head = h('div', { className: 'mhead' },
       info.cover ? h('img', { src: info.cover, referrerPolicy: 'no-referrer' }) : null,
       h('div', { className: 'info' },
         h('div', { className: 'tt' }, info.title || '（无标题）'),
         h('div', { className: 'ss' },
-          cur ? '视频 ' + (cur.label || cur.height + 'P') + (cur.codec ? ' · ' + cur.codec : '') + (estSize(cur) ? ' · ' + estSize(cur) : '') : ''),
+          cur ? [(cur.codec || ''), estSize(cur)].filter(Boolean).join(' · ') : ''),
       ),
     );
     card.append(head);

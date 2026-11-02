@@ -105,7 +105,7 @@
   .pick.on .cap{color:var(--accent);font-weight:600}
   .pick.round .frame{border-radius:50%}
   .pick.round img{width:64px;height:64px;border-radius:50%}
-  .picks .pick.round{margin-left:auto}
+
 
   button{border:none;border-radius:9px;padding:9px 15px;font-size:13px;cursor:pointer;background:var(--accent);color:#fff;font-weight:600}
   button:disabled{opacity:.5;cursor:default}
@@ -148,8 +148,10 @@
   .mrow .tick{width:14px;text-align:center;color:var(--accent)}
   /* 媒体资源卡片 */
   .mcard{border:1px solid var(--line);border-radius:12px;padding:10px;margin-bottom:10px;background:#fff}
-  .mhead{display:flex;gap:9px;margin-bottom:9px}
-  .mhead img{width:76px;height:43px;object-fit:cover;border-radius:7px;background:#eef2f8;flex:0 0 auto}
+  .mcard h4{margin:0 0 9px;font-size:11.5px;color:var(--sub);font-weight:600;display:flex;justify-content:space-between;gap:8px}
+  .mcard h4 span{font-weight:400;white-space:nowrap;opacity:.9}
+  .mhead{display:flex;gap:9px;margin-bottom:9px;align-items:stretch}
+  .mhead img{width:96px;height:auto;min-height:54px;object-fit:cover;border-radius:7px;background:#eef2f8;flex:0 0 auto;align-self:stretch}
   .mhead .info{min-width:0;flex:1}
   .mhead .tt{font-size:12.5px;font-weight:600;line-height:1.35;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
   .mhead .ss{font-size:11px;color:var(--sub);margin-top:4px}
