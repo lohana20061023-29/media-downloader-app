@@ -91,7 +91,7 @@ function createMain() {
     width: 1180, height: 820, minWidth: 1000, minHeight: 680,
     title: 'LoDown', backgroundColor: '#f6f2ea', show: false,
     autoHideMenuBar: true,
-    webPreferences: { preload: join(__dirname, 'preload.cjs'), contextIsolation: true, nodeIntegration: false },
+    webPreferences: { preload: join(__dirname, 'preload.cjs'), contextIsolation: true, nodeIntegration: false, webviewTag: true },
   });
   mainWin.loadFile(join(__dirname, 'renderer', 'index.html'));
   mainWin.once('ready-to-show', () => mainWin.show());
@@ -300,6 +300,22 @@ ipcMain.handle('pick-dir', async () => {
   if (res.canceled || !res.filePaths[0]) return { dir: '' };
   saveState({ outDir: res.filePaths[0] });
   return { dir: res.filePaths[0] };
+});
+
+/* ── 浏览记录（与下载历史分开）── */
+ipcMain.handle('browse-list', () => Array.isArray(state.browse) ? state.browse : []);
+ipcMain.handle('browse-add', (_e, item) => {
+  if (!item || !item.url || !/^https?:/i.test(item.url)) return Array.isArray(state.browse) ? state.browse : [];
+  const list = (Array.isArray(state.browse) ? state.browse : []).filter((x) => x.url !== item.url);
+  const next = [{ url: item.url, title: (item.title || item.url).slice(0, 200), at: Date.now() }, ...list].slice(0, 500);
+  saveState({ browse: next });
+  return next;
+});
+ipcMain.handle('browse-clear', () => { saveState({ browse: [] }); return []; });
+ipcMain.handle('browse-remove', (_e, url) => {
+  const list = (Array.isArray(state.browse) ? state.browse : []).filter((x) => x.url !== url);
+  saveState({ browse: list });
+  return list;
 });
 
 /* ── 历史记录 ── */

@@ -4,115 +4,103 @@
 <title>LoDown</title>
 <style>
   :root{
-    --bg:#f6f2ea; --panel:#fff; --line:#dbe3f0; --ink:#16233a; --sub:#6b7d95;
-    --accent:#2464e8; --accent-soft:#e8efff;
+    --bg:#f2f4f7; --panel:#fff; --line:#dbe3f0; --ink:#16233a; --sub:#6b7d95;
+    --accent:#2464e8; --accent-soft:#e8efff; --ok:#1a9c5b; --bad:#c0392b;
   }
   *{box-sizing:border-box}
   html,body{height:100%}
   body{margin:0;background:var(--bg);color:var(--ink);overflow:hidden;
-    font:14px/1.5 "Microsoft YaHei UI","Segoe UI",system-ui,sans-serif;
-    -webkit-user-select:none;user-select:none}
+    font:14px/1.5 "Microsoft YaHei UI","Segoe UI",system-ui,sans-serif;-webkit-user-select:none;user-select:none}
   .app{display:flex;height:100vh}
 
-  /* ── 左侧细栏 ── */
-  .rail{width:64px;flex:0 0 64px;background:#fff;border-right:1px solid var(--line);
-    display:flex;flex-direction:column;align-items:center;padding:12px 0 8px;gap:4px}
-  .rail .logo{width:36px;height:36px;border-radius:10px;margin-bottom:10px;
-    background:var(--accent);display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800;font-size:16px}
-  .rail button{width:52px;height:54px;border:none;background:none;border-radius:10px;cursor:pointer;
-    display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;color:var(--sub);font-size:10.5px}
-  .rail button svg{width:19px;height:19px;stroke:currentColor;fill:none;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+  .rail{width:60px;flex:0 0 60px;background:#fff;border-right:1px solid var(--line);
+    display:flex;flex-direction:column;align-items:center;padding:10px 0;gap:4px}
+  .rail .logo{width:36px;height:36px;border-radius:10px;margin-bottom:10px;background:var(--accent);
+    display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800;font-size:16px}
+  .rail button{width:50px;height:52px;border:none;background:none;border-radius:10px;cursor:pointer;
+    display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;color:var(--sub);font-size:10px}
+  .rail button svg{width:18px;height:18px;stroke:currentColor;fill:none;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
   .rail button.on{background:var(--accent-soft);color:var(--accent);font-weight:600}
   .rail button:hover{background:#f0f4fb}
   .rail .spacer{flex:1}
 
-  /* ── 主区 ── */
-  .main{flex:1;min-width:0;display:flex;flex-direction:column}
-  .tabs{display:flex;align-items:center;gap:6px;padding:8px 12px 0;overflow-x:auto}
-  .tab{display:flex;align-items:center;gap:7px;max-width:240px;padding:8px 10px;border-radius:10px 10px 0 0;
-    background:#e9eef7;color:var(--sub);font-size:12.5px;cursor:pointer;white-space:nowrap;
-    border:1px solid transparent;border-bottom:none}
-  .tab.on{background:#fff;color:var(--ink);border-color:var(--line);font-weight:600}
-  .tab .x{width:16px;height:16px;line-height:14px;text-align:center;border-radius:50%;color:#98a6bb;flex:0 0 auto}
-  .tab .x:hover{background:#d9e2f0;color:#455468}
-  .tab span.t{overflow:hidden;text-overflow:ellipsis;max-width:175px}
+  .main{flex:1;min-width:0;display:flex;flex-direction:column;position:relative}
 
-  .body{flex:1;min-height:0;display:flex;background:#fff;border-top:1px solid var(--line)}
-  .content{flex:1;min-width:0;overflow:auto;padding:16px 18px}
-  .side{width:308px;flex:0 0 308px;border-left:1px solid var(--line);overflow:auto;padding:14px;background:#fbfcfe}
+  .toolbar{display:flex;gap:6px;align-items:center;padding:8px 10px;background:#fff;border-bottom:1px solid var(--line)}
+  .toolbar button.nav{width:30px;height:30px;padding:0;background:none;color:var(--sub);border-radius:8px;font-size:15px}
+  .toolbar button.nav:hover{background:#eef3fb;color:var(--ink)}
+  .toolbar input{flex:1;min-width:0;padding:7px 12px;border:1px solid var(--line);border-radius:99px;background:#f7f9fc;font-size:13px;outline:none;-webkit-user-select:text;user-select:text}
+  .toolbar input:focus{background:#fff;border-color:var(--accent)}
+  .toolbar .dl{padding:6px 14px;border-radius:8px;font-size:12.5px}
+  .toolbar .dl:disabled{background:#e9eef7;color:#9aa8bd}
+
+  .workspace{flex:1;min-height:0;display:flex}
+  .browse{flex:1;min-width:0;position:relative;display:flex}
+  webview{flex:1;border:0;background:#fff}
+  .startpage{position:absolute;inset:0;background:var(--bg);display:flex;align-items:center;justify-content:center}
+  .startpage .inner{text-align:center}
+  .startpage h1{font-size:30px;margin:0 0 8px;letter-spacing:.5px}
+  .startpage p{color:var(--sub);font-size:13px;margin:0}
+
+  .side{width:308px;flex:0 0 308px;border-left:1px solid var(--line);overflow:auto;padding:13px;background:#fff}
   .side[hidden]{display:none}
 
-  /* ── 通用 ── */
-  input[type=text]{width:100%;padding:10px 12px;border:1px solid var(--line);border-radius:10px;
-    background:#fff;font-size:14px;outline:none;-webkit-user-select:text;user-select:text}
-  input[type=text]:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
-  button{border:none;border-radius:10px;padding:9px 15px;font-size:13.5px;cursor:pointer;background:var(--accent);color:#fff;font-weight:600}
+  .page{flex:1;min-height:0;overflow:auto;padding:14px 16px;background:var(--bg)}
+  .page[hidden]{display:none}
+
+  .segs{display:flex;gap:8px;align-items:center;margin-bottom:12px;flex-wrap:wrap}
+  .seg{padding:7px 13px;border-radius:9px;background:#fff;border:1px solid var(--line);font-size:13px;cursor:pointer;color:var(--sub)}
+  .seg.on{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:600}
+  .seg .n{margin-left:6px;opacity:.85}
+  .segs .right{margin-left:auto;display:flex;gap:8px;align-items:center}
+
+  .card{background:#fff;border:1px solid var(--line);border-radius:12px;padding:12px;margin-bottom:10px}
+  .item{display:flex;gap:10px;align-items:center;padding:9px 0;border-top:1px solid #eef2f8}
+  .item:first-child{border-top:none}
+  .item .nm{flex:1;min-width:0;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .item .sub2{color:var(--sub);font-size:11.5px}
+  .item .pbar{width:110px;height:5px;background:#e8eef8;border-radius:99px;overflow:hidden;flex:0 0 auto}
+  .item .pbar i{display:block;height:100%;background:var(--accent)}
+  .item .pc{width:44px;text-align:right;font-size:11.5px;color:var(--sub);flex:0 0 auto}
+  .thumb-sm{width:52px;height:30px;border-radius:6px;object-fit:cover;background:#eef2f8;flex:0 0 auto}
+  .lnk{color:var(--accent);font-size:12px;cursor:pointer;flex:0 0 auto}
+  .empty{color:var(--sub);font-size:13px;text-align:center;padding:56px 0}
+  .empty svg{width:38px;height:38px;stroke:#c3cede;fill:none;stroke-width:1.5;margin-bottom:10px}
+
+  .sec{border:1px solid var(--line);border-radius:11px;padding:10px;margin-bottom:9px}
+  .sec h4{margin:0 0 8px;font-size:11.5px;color:var(--sub);font-weight:600;display:flex;justify-content:space-between;gap:8px}
+  .sec h4 span{font-weight:400;white-space:nowrap;opacity:.9}
+  .opts{display:flex;flex-wrap:wrap;gap:6px}
+  .opt{border:1px solid var(--line);border-radius:8px;padding:5px 10px;background:#fff;cursor:pointer;font-size:12px}
+  .opt.on{border-color:var(--accent);background:var(--accent-soft);color:var(--accent);font-weight:600}
+  label.chk{display:inline-flex;align-items:center;gap:6px;cursor:pointer;font-size:12px}
+  .picks{display:flex;gap:9px;flex-wrap:wrap}
+  .pick{display:flex;flex-direction:column;align-items:center;gap:4px;cursor:pointer}
+  .pick .frame{border:2px solid var(--line);border-radius:8px;overflow:hidden;background:#fff}
+  .pick img{display:block;width:96px;height:54px;object-fit:cover;background:#eef2f8}
+  .pick.on .frame{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+  .pick .cap{font-size:10.5px;color:var(--sub)}
+  .pick.on .cap{color:var(--accent);font-weight:600}
+  .pick.round .frame{border-radius:50%}
+  .pick.round img{width:58px;height:58px;border-radius:50%}
+
+  button{border:none;border-radius:9px;padding:9px 15px;font-size:13px;cursor:pointer;background:var(--accent);color:#fff;font-weight:600}
   button:disabled{opacity:.5;cursor:default}
   button.ghost{background:#fff;border:1px solid var(--line);color:var(--ink);font-weight:500}
   .h1{font-size:15px;font-weight:700;margin:0 0 12px;display:flex;align-items:center;gap:8px}
   .h1 .sub{font-weight:400;font-size:11.5px;color:var(--sub)}
-  .empty{color:var(--sub);font-size:13px;text-align:center;padding:38px 0}
-  .sec{border:1px solid var(--line);border-radius:12px;padding:11px;margin-bottom:10px;background:#fff}
-  .sec h4{margin:0 0 9px;font-size:12px;color:var(--sub);font-weight:600;display:flex;justify-content:space-between;gap:10px}
-  .sec h4 span{font-weight:400;white-space:nowrap;flex:0 0 auto;opacity:.9}
-  .opts{display:flex;flex-wrap:wrap;gap:7px}
-  .opt{border:1px solid var(--line);border-radius:9px;padding:6px 11px;background:#fff;cursor:pointer;font-size:12.5px}
-  .opt.on{border-color:var(--accent);background:var(--accent-soft);color:var(--accent);font-weight:600}
-  label.chk{display:inline-flex;align-items:center;gap:6px;cursor:pointer;font-size:12.5px}
-  .picks{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-start}
-  .pick{display:flex;flex-direction:column;align-items:center;gap:5px;cursor:pointer}
-  .pick .frame{border:2px solid var(--line);border-radius:8px;overflow:hidden;background:#fff}
-  .pick img{display:block;width:104px;height:59px;object-fit:cover;background:#eef2f8}
-  .pick.on .frame{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
-  .pick .cap{font-size:11px;color:var(--sub);max-width:104px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-  .pick.on .cap{color:var(--accent);font-weight:600}
-  .pick.round .frame{border-radius:50%}
-  .pick.round img{width:62px;height:62px;border-radius:50%}
-
-  /* 主页 */
-  .hero{max-width:660px;margin:7vh auto 0;text-align:center}
-  .hero .title{font-size:26px;font-weight:800;letter-spacing:.5px;margin-bottom:6px}
-  .hero .tip{color:var(--sub);font-size:13px;margin-bottom:22px}
-  .hero .bar{display:flex;gap:8px}
-  .hero .platforms{margin-top:26px;display:flex;gap:8px;justify-content:center;flex-wrap:wrap;color:var(--sub);font-size:12px}
-  .hero .platforms span{padding:5px 10px;border:1px solid var(--line);border-radius:99px;background:#fff}
-
-  /* 详情 */
-  .meta{display:flex;gap:12px}
-  .meta>div:last-child{min-width:0;flex:1}
-  .meta img.cover{width:150px;height:84px;object-fit:cover;border-radius:10px;background:#eef2f8}
-  .meta .t{font-weight:700;font-size:15px;line-height:1.35;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
-  .meta .s{color:var(--sub);font-size:12px;margin-top:6px}
-  .desc{margin-top:7px;color:var(--sub);font-size:12.5px;line-height:1.5;
-    display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;cursor:pointer;
-    -webkit-user-select:text;user-select:text}
-  .desc.open{-webkit-line-clamp:unset;display:block}
-
-  /* 列表 */
-  .item{display:flex;gap:10px;align-items:center;padding:10px 0;border-top:1px solid var(--line)}
-  .item:first-of-type{border-top:none}
-  .item .nm{flex:1;min-width:0;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-  .item .pbar{width:110px;height:5px;background:#e8eef8;border-radius:99px;overflow:hidden;flex:0 0 auto}
-  .item .pbar i{display:block;height:100%;background:var(--accent)}
-  .item .pc{width:42px;text-align:right;font-size:11.5px;color:var(--sub);flex:0 0 auto}
-  .thumb-sm{width:52px;height:30px;border-radius:6px;object-fit:cover;background:#eef2f8;flex:0 0 auto}
-  .item .lnk{color:var(--accent);font-size:12px;cursor:pointer;flex:0 0 auto}
-
-  /* 设置 */
-  .kv{display:flex;align-items:center;gap:10px;padding:10px 0;border-top:1px solid var(--line)}
-  .kv:first-of-type{border-top:none}
-  .kv .k{width:84px;color:var(--sub);font-size:12.5px;flex:0 0 auto}
+  .kv{display:flex;align-items:center;gap:10px;padding:9px 0;border-top:1px solid #eef2f8}
+  .kv:first-child{border-top:none}
+  .kv .k{width:80px;color:var(--sub);font-size:12.5px;flex:0 0 auto}
   .kv .v{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px}
-  .footer{display:flex;gap:8px;align-items:center;padding:10px 14px;border-top:1px solid var(--line);background:#fff}
-  .footer .dir{flex:1;color:var(--sub);font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:pointer}
-  .err{color:#c0392b;font-size:12.5px;margin-top:8px}
+  .err{color:var(--bad);font-size:12.5px;margin-top:8px}
 </style>
 
 <div class="app">
   <div class="rail">
     <div class="logo">L</div>
     <button id="nav-browse" class="on">
-      <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+      <svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 8h18"/></svg>
       浏览
     </button>
     <button id="nav-downloads">
@@ -131,15 +119,29 @@
   </div>
 
   <div class="main">
-    <div class="tabs" id="tabs"></div>
-    <div class="body">
-      <div class="content" id="content"></div>
+    <div class="toolbar" id="toolbar">
+      <button class="nav" id="back" title="后退">←</button>
+      <button class="nav" id="forward" title="前进">→</button>
+      <button class="nav" id="reload" title="刷新">⟳</button>
+      <button class="nav" id="home" title="起始页">⌂</button>
+      <input id="addr" type="text" placeholder="输入网址或搜索…" spellcheck="false">
+      <button class="dl" id="download" disabled>下载此页</button>
+    </div>
+
+    <div class="workspace">
+      <div class="browse" id="browseArea">
+        <webview id="view" src="about:blank"></webview>
+        <div class="startpage" id="startpage">
+          <div class="inner">
+            <h1>LoDown</h1>
+            <p>上方输入网址开始浏览；支持的站点右上角会出现「下载此页」</p>
+          </div>
+        </div>
+      </div>
       <div class="side" id="side" hidden></div>
     </div>
-    <div class="footer">
-      <span class="dir" id="dir">下载目录</span>
-      <button class="ghost" id="pick">选择…</button>
-    </div>
+
+    <div class="page" id="page" hidden></div>
   </div>
 </div>
 <script src="app.js"></script>
