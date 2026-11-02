@@ -85,6 +85,7 @@ async function boot() {
 
   goHome();
   refreshSites();
+  setView('browse');
 }
 
 const view = () => $('view');
@@ -126,12 +127,12 @@ function setView(v) {
 
   const isBrowse = v === 'browse';
   $('toolbar').style.display = isBrowse ? '' : 'none';
-  $('browseArea').style.display = isBrowse ? '' : 'none';
-  $('side').hidden = !isBrowse || !S.info;
+  $('workspace').hidden = !isBrowse;     // 非浏览时整块收起，page 才能占满
   $('page').hidden = isBrowse;
+  $('side').hidden = false;              // 侧栏常驻
 
-  if (!isBrowse) renderPage();
-  else if (S.info) renderSide();
+  if (isBrowse) renderSide();            // 未解析时渲染占位
+  else renderPage();
 }
 
 /* ── 页面：下载 / 历史 / 设置 ── */
@@ -290,11 +291,9 @@ async function beginParse(url) {
       coverIds: [], avatar: false, imageIds: [],
     };
     S.err = '';
-    $('side').hidden = false;
     renderSide();
   } catch (e) {
     S.err = e.message || String(e);
-    $('side').hidden = false;
     renderSide();
   } finally {
     dl.textContent = '下载此页';
@@ -308,7 +307,14 @@ function renderSide() {
 
   if (S.err) { box.append(h('div', { className: 'err' }, '解析失败：' + S.err)); return; }
   const info = S.info;
-  if (!info) return;
+  if (!info) {
+    box.append(h('div', { className: 'h1', style: 'font-size:14px' }, '下载内容'));
+    box.append(h('div', { className: 'empty', style: 'padding:38px 0' },
+      icon('M12 4v10m0 0l-4-4m4 4l4-4M5 18h14'),
+      h('div', {}, '打开支持的站点后，点右上角「下载此页」'),
+    ));
+    return;
+  }
   const pick = S.pick;
 
   box.append(h('div', { className: 'h1', style: 'font-size:14px' }, '下载内容'));
@@ -380,7 +386,6 @@ async function startDownload() {
   const rec = { id: job.id, title: S.info.title, cover: S.info.cover, items: job.items || [], at: Date.now(), status: job.status || 'running' };
   S.jobs.unshift(rec);
   S.info = null; S.pick = null; S.err = '';
-  $('side').hidden = true;
   setView('downloads');
   poll(rec);
 }
