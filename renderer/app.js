@@ -237,6 +237,11 @@ async function onNavigate(tab, url) {
   try { icon = tab.wv.getFavicon() || tab.icon || ''; } catch { icon = tab.icon || ''; }
   if (icon) tab.icon = icon;
 
+  /* 写浏览记录（标题先用当前拿到的，页面标题定稿后由 page-title-updated 回写） */
+  try {
+    S.history = await window.api.browseAdd({ url, title: tab.title || url, icon });
+  } catch { }
+
   if (SUPPORTED.test(url)) {
     tab.info = null; tab.err = ''; tab.panelOpen = true;
     clearTimeout(tab.timer);
