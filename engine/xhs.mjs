@@ -114,26 +114,42 @@ async function probeMobile({ id, token }) {
 const CODEC_PREF = [['h264', 'H.264'], ['h265', 'H.265'], ['av1', 'AV1'], ['h266', 'H.266']];
 
 function extractVideos(note) {
-  const stream = note?.video?.media?.stream;
-  if (!stream) return [];
   const out = [];
-  for (const [key, label] of CODEC_PREF) {
-    for (const item of stream[key] || []) {
-      if (!item?.masterUrl) continue;
-      out.push({
-        qn: item.height || 720,
-        label: label + (item.height ? ` ${item.height}P` : ''),
-        codec: label,
-        height: item.height || 0,
-        vip: false,
-        bandwidth: item.avgBitrate || item.videoBitrate || 0,
-        url: item.masterUrl,
-        backups: item.backupUrls || [],
-      });
+  const push = (url, height, label, codec, bw, backups) => {
+    if (!url || out.some((x) => x.url === url)) return;
+    out.push({
+      qn: height || 720,
+      label: (label || '视频') + (height ? ` ${height}P` : ''),
+      codec: codec || label || '',
+      height: height || 0,
+      vip: false,
+      bandwidth: bw || 0,
+      url,
+      backups: backups || [],
+    });
+  };
+
+  /* ① 标准结构：video.media.stream.{h264|h265|av1|h266}[] */
+  const stream = note?.video?.media?.stream;
+  if (stream) {
+    for (const [key, label] of CODEC_PREF) {
+      for (const item of stream[key] || []) {
+        push(item?.masterUrl, item?.height, label, label, item?.avgBitrate || item?.videoBitrate, item?.backupUrls);
+      }
     }
   }
+
+  /* ② 兜底：originVideoKey 拼 CDN 地址（老结构常见） */
+  const key = note?.video?.consumer?.originVideoKey || note?.video?.consumer?.originVideoKeyV2;
+  if (key) push('https://sns-video-bd.xhscdn.com/' + String(key).replace(/^\/+/, ''), 0, '视频', 'AVC', 0, []);
+
+  /* ③ 兜底：少数笔记直接给 url / media.video.url */
+  const direct = note?.video?.url || note?.video?.media?.video?.url || note?.video?.media?.video?.masterUrl;
+  if (direct) push(direct, 0, '视频', 'AVC', 0, []);
+
   return out;
 }
+
 
 /**
  * 小红书图片水印的两个来源：

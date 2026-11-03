@@ -146,7 +146,6 @@ function newTab(url) {
   const tab = { id: uid(), url: '', title: '新标签页', wv: null, info: null, pick: null, err: '', panelOpen: true };
   const wv = document.createElement('webview');
   wv.className = 'view';
-  wv.setAttribute('allowpopups', '');
   wv.setAttribute('src', 'about:blank');
   /* 页面里点开的链接（target=_blank / window.open）→ 在本应用新标签页打开，不弹独立窗口 */
   wv.addEventListener('new-window', (e) => {
