@@ -95,6 +95,20 @@ async function boot() {
     if (S.view === 'settings') renderPage();
   });
 
+  /* 标题轮询：每秒读一次当前标签的真实标题（站内跳转不一定发事件） */
+  S.titlePoll = setInterval(async () => {
+    const tab = active();
+    if (!tab || !tab.wv || !tab.ready || S.view !== 'browse') return;
+    try {
+      const t = await tab.wv.executeJavaScript('document.title');
+      if (t && t !== tab.title) {
+        tab.title = t;
+        renderTabs();
+        S.history = await window.api.browseSetTitle({ url: tab.url, title: t, icon: tab.icon || '' });
+      }
+    } catch { }
+  }, 1000);
+
   activate(S.homeId);
   refreshSites();
 }
@@ -237,7 +251,8 @@ function navigate(url) {
 async function onNavigate(tab, url) {
   if (!/^https?:/i.test(url)) return;
   tab.url = url;
-  try { tab.title = tab.wv.getTitle() || url.replace(/^https?:\/\//,'').replace(/\/$/,''); } catch { tab.title = url; }
+  /* 刚导航时 getTitle() 还是上一页的标题，先用域名占位 */
+  try { tab.title = new URL(url).hostname.replace(/^www\./, ''); } catch { tab.title = url; }
   if (tab.id === S.activeId) {
     $('addr').value = url;
   if ($('download')) $('download').disabled = !SUPPORTED.test(url);
@@ -248,17 +263,6 @@ async function onNavigate(tab, url) {
   if (icon) tab.icon = icon;
 
   /* SPA 内跳转常常不发标题事件：两个时间点各补抓一次 */
-  clearTimeout(tab.titleTimer);
-  tab.titleTimer = setTimeout(async () => {
-    try {
-      const t = tab.wv.getTitle();
-      if (t && t !== tab.title) {
-        tab.title = t;
-        renderTabs();
-        S.history = await window.api.browseSetTitle({ url: tab.url, title: t, icon: tab.icon || '' });
-      }
-    } catch {}
-  }, 1500);
 
   /* 写浏览记录（标题先用当前拿到的，页面标题定稿后由 page-title-updated 回写） */
   try {
