@@ -7,6 +7,7 @@ contextBridge.exposeInMainWorld('api', {
   winClose: () => ipcRenderer.invoke('win-close'),
   bootstrap: () => ipcRenderer.invoke('bootstrap'),
   probe: (url) => ipcRenderer.invoke('probe', url),
+  xhsFromPage: (payload) => ipcRenderer.invoke('xhs-from-page', payload),
   start: (payload) => ipcRenderer.invoke('start', payload),
   job: (id) => ipcRenderer.invoke('job', id),
   pickDir: () => ipcRenderer.invoke('pick-dir'),

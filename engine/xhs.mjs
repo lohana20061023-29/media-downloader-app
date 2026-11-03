@@ -90,6 +90,22 @@ function extractState(html) {
   return null;
 }
 
+/** 从共享 cookies.txt 里拼出小红书 Cookie（账号面板登录后会写进去） */
+function xhsCookieHeader() {
+  try {
+    const text = readFileSync(join(ROOT, 'cookies.txt'), 'utf8');
+    const pairs = [];
+    for (const line of text.split(/\r?\n/)) {
+      if (!line || line.startsWith('#')) continue;
+      const parts = line.split('\t');
+      if (parts.length < 7) continue;
+      if (!/xiaohongshu\.com$|xhscdn\.com$/.test(String(parts[0]).replace(/^\./, ''))) continue;
+      pairs.push(parts[5] + '=' + parts[6]);
+    }
+    return pairs.join('; ');
+  } catch { return ''; }
+}
+
 async function probeMobile({ id, token }) {
   const url = `https://www.xiaohongshu.com/discovery/item/${id}`
     + `?source=webshare&xhsshare=pc_web&xsec_token=${encodeURIComponent(token)}&xsec_source=pc_share`;
@@ -325,6 +341,12 @@ async function probeBrowser(targetUrl, id) {
   }
 }
 
+
+/** 把页面里拿到的 note 原始对象直接归一化（浏览标签页内解析用） */
+export function normalizeNoteObject(note, id) {
+  if (!note || !note.noteId) throw new Error('页面里没有笔记数据');
+  return normalize(note, id, null);
+}
 
 /* ── 对外 ──────────────────────────────────────────────────────────── */
 

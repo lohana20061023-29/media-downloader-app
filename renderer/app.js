@@ -476,7 +476,33 @@ async function parseTab(tab, auto) {
   const dl = $('download');
   if (dl && !auto) { dl.disabled = true; dl.textContent = '解析中…'; }
   try {
-    const info = await window.api.probe(tab.url);
+    let info = null;
+
+    /* 小红书：优先从当前浏览页直接读数据（真实会话，最不容易被风控） */
+    if (/xiaohongshu\.com/.test(tab.url || '')) {
+      try {
+        const raw = await tab.wv.executeJavaScript(
+          "(function(){"
+          + "var m=window.__INITIAL_STATE__&&window.__INITIAL_STATE__.note&&window.__INITIAL_STATE__.note.noteDetailMap;"
+          + "if(!m)return '';"
+          + "var k=Object.keys(m)[0]; var e=m[k]; var n=e&&(e.note||e);"
+          + "if(!n||!n.noteId)return '';"
+          + "return JSON.stringify({id:n.noteId,note:{noteId:n.noteId,type:n.type,title:n.title,desc:n.desc,"
+          + "user:{nickName:(n.user&&n.user.nickname)||'',avatar:(n.user&&n.user.avatar)||''},"
+          + "imageList:(n.imageList||[]).map(function(i){return {urlDefault:i.urlDefault||i.url,infoList:i.infoList}}),"
+          + "video:n.video||null}});"
+          + "})()",
+        );
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          const r = await window.api.xhsFromPage({ note: parsed.note, id: parsed.id });
+          if (r && r.ok) info = r.info;
+        }
+      } catch { /* 页面没数据就退回引擎 */ }
+    }
+
+    if (!info) info = await window.api.probe(tab.url);
+
     tab.info = info;
     tab.err = '';
     tab.pick = {
@@ -489,7 +515,6 @@ async function parseTab(tab, auto) {
     tab.info = null;
   } finally {
     if (dl) { dl.textContent = '下载此页'; dl.disabled = false; }
-
   }
   if (tab.id === S.activeId) renderSide();
 }

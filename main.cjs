@@ -212,6 +212,23 @@ ipcMain.handle('win-max', () => {
 });
 ipcMain.handle('win-close', () => { app.isQuitting = true; if (mainWin) mainWin.close(); });
 
+ipcMain.handle('xhs-from-page', async (_e, payload) => {
+  const e = await loadEngine();
+  const note = payload && payload.note;
+  const id = (payload && payload.id) || (note && note.noteId) || '';
+  if (!note) return { ok: false, error: '没有页面数据' };
+  try {
+    const info = { ...e.xhs.normalizeNoteObject(note, id), source: 'xhs' };
+    e.bili.registerImage(info.cover);
+    (info.covers || []).forEach((c) => e.bili.registerImage(c.url));
+    (info.images || []).forEach((c) => e.bili.registerImage(c.url));
+    e.bili.registerImage(info.up?.face);
+    return { ok: true, info };
+  } catch (err) {
+    return { ok: false, error: err.message };
+  }
+});
+
 ipcMain.handle('bootstrap', async () => {
   const e = await loadEngine();
   const me = await e.bili.loginStatus().catch(() => ({ login: false, uname: '', face: '' }));
