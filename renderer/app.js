@@ -593,6 +593,7 @@ function renderPage() {
 }
 
 function renderDownloads(box) {
+  const wrap = h('div', { className: 'pwrap' });
   const counts = { all: S.jobs.length, waiting: 0, running: 0, done: 0, failed: 0 };
   for (const j of S.jobs) counts[statusOf(j)]++;
 
@@ -605,11 +606,12 @@ function renderDownloads(box) {
   const clear = h('button', { className: 'ghost' }, '清除已结束');
   clear.onclick = () => { S.jobs = S.jobs.filter((j) => !['done', 'error'].includes(j.status)); renderPage(); };
   segs.append(h('div', { className: 'right' }, timeFilter(() => S.dlTime, (v) => { S.dlTime = v; }), clear));
-  box.append(segs);
+  wrap.append(segs);
 
   const list = S.jobs.filter((j) => (S.dlFilter === 'all' || statusOf(j) === S.dlFilter) && inTimeRange(j.at, S.dlTime));
   if (!list.length) {
-    box.append(h('div', { className: 'empty' }, icon('M12 4v10m0 0l-4-4m4 4l4-4M5 18h14'), h('div', {}, '暂无下载')));
+    wrap.append(h('div', { className: 'empty' }, icon('M12 4v10m0 0l-4-4m4 4l4-4M5 18h14'), h('div', {}, '暂无下载')));
+    box.append(wrap);
     return;
   }
   for (const job of list) {
@@ -625,8 +627,9 @@ function renderDownloads(box) {
         h('span', { className: 'pc' }, it.status === 'done' ? '✓' : pct + '%'),
       ));
     }
-    box.append(card);
+    wrap.append(card);
   }
+  box.append(wrap);
 }
 
 function dayLabel(ts) {
@@ -639,15 +642,17 @@ function dayLabel(ts) {
 }
 
 function renderHistory(box) {
+  const wrap = h('div', { className: 'pwrap' });
   const segs = h('div', { className: 'segs' }, h('div', { className: 'seg on' }, '浏览记录', h('span', { className: 'n' }, S.history.length)));
   const clr = h('button', { className: 'ghost' }, '清空');
   clr.onclick = async () => { S.history = await window.api.browseClear(); renderPage(); };
   segs.append(h('div', { className: 'right' }, timeFilter(() => S.histTime, (v) => { S.histTime = v; }), clr));
-  box.append(segs);
+  wrap.append(segs);
 
   const list = S.history.filter((it) => inTimeRange(it.at, S.histTime));
   if (!list.length) {
-    box.append(h('div', { className: 'empty' }, icon('M12 8v4l3 2M4 12a8 8 0 1 1 8 8'), h('div', {}, '这个时间段没有记录')));
+    wrap.append(h('div', { className: 'empty' }, icon('M12 8v4l3 2M4 12a8 8 0 1 1 8 8'), h('div', {}, '这个时间段没有记录')));
+    box.append(wrap);
     return;
   }
 
@@ -660,7 +665,7 @@ function renderHistory(box) {
   }
 
   for (const [label, items] of groups) {
-    box.append(h('div', { className: 'hdate' }, label));
+    wrap.append(h('div', { className: 'hdate' }, label));
 
     for (const it of items) {
       let host = '';
@@ -689,9 +694,10 @@ function renderHistory(box) {
         del,
       );
       row.onclick = () => { setView('browse', true); newTab(it.url); };
-      box.append(row);
+      wrap.append(row);
     }
   }
+  box.append(wrap);
 }
 
 function renderSettings(box) {
