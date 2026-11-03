@@ -370,11 +370,38 @@ ipcMain.handle('pick-dir', async () => {
 ipcMain.handle('browse-list', () => Array.isArray(state.browse) ? state.browse : []);
 ipcMain.handle('browse-add', (_e, item) => {
   if (!item || !item.url || !/^https?:/i.test(item.url)) return Array.isArray(state.browse) ? state.browse : [];
-  const list = (Array.isArray(state.browse) ? state.browse : []).filter((x) => x.url !== item.url);
-  const next = [{ url: item.url, title: (item.title || item.url).slice(0, 200), icon: item.icon || '', at: Date.now() }, ...list].slice(0, 500);
+  const clean = cleanUrl(item.url);
+  const list = (Array.isArray(state.browse) ? state.browse : []).filter((x) => cleanUrl(x.url) !== clean);
+  const next = [{ url: cleanUrl(item.url), title: (item.title || item.url).slice(0, 200), icon: item.icon || '', at: Date.now() }, ...list].slice(0, 500);
   saveState({ browse: next });
   return next;
 });
+/* 去掉跟踪参数，避免同一条记录被存成好几份 */
+function cleanUrl(u) {
+  try {
+    const url = new URL(u);
+    for (const k of ['vd_source', 'share_source', 'share_medium', 'share_plat', 'share_tag', 'spm_id_from', 'trackid', 'unique_k', 'from_source', 'from_spmid', 'timestamp', 'buvid', 'up_id', 'broadcast_type', 'is_room_feed']) {
+      url.searchParams.delete(k);
+    }
+    return url.origin + url.pathname + (url.search || '');
+  } catch { return u; }
+}
+
+ipcMain.handle('browse-set-title', (_e, payload) => {
+  const list = Array.isArray(state.browse) ? state.browse : [];
+  const clean = cleanUrl(payload && payload.url || '');
+  let changed = false;
+  for (const it of list) {
+    if (cleanUrl(it.url) === clean && payload.title && it.title !== payload.title) {
+      it.title = String(payload.title).slice(0, 200);
+      changed = true;
+      break;
+    }
+  }
+  if (changed) saveState({ browse: list });
+  return list;
+});
+
 ipcMain.handle('browse-clear', () => { saveState({ browse: [] }); return []; });
 ipcMain.handle('browse-remove', (_e, url) => {
   const list = (Array.isArray(state.browse) ? state.browse : []).filter((x) => x.url !== url);

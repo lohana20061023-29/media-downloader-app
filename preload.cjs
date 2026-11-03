@@ -12,6 +12,7 @@ contextBridge.exposeInMainWorld('api', {
   config: (patch) => ipcRenderer.invoke('config', patch),
   browseList: () => ipcRenderer.invoke('browse-list'),
   browseAdd: (item) => ipcRenderer.invoke('browse-add', item),
+  browseSetTitle: (p) => ipcRenderer.invoke('browse-set-title', p),
   browseClear: () => ipcRenderer.invoke('browse-clear'),
   browseRemove: (url) => ipcRenderer.invoke('browse-remove', url),
   historyList: () => ipcRenderer.invoke('history-list'),
