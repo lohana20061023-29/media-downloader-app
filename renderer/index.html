@@ -201,7 +201,6 @@
   .tablist{display:flex;align-items:flex-end;gap:4px;flex:1;min-width:0;overflow-x:auto}
   .tabs .tab,.tabs .add,.tabs .winbtns{-webkit-app-region:no-drag}
   .winbtns,.winbtns button{-webkit-app-region:no-drag}
-  .winbtns{margin-left:auto;display:flex;align-items:center;gap:2px;align-self:flex-start;margin-top:-2px}
   .winbtns button{width:42px;height:30px;display:flex;align-items:center;justify-content:center;background:none;border:none;border-radius:6px;color:var(--sub);cursor:pointer;padding:0}
   .winbtns button svg{width:18px;height:18px;stroke:currentColor;fill:none;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
   .winbtns button:hover{background:#dde5f1;color:var(--ink)}
@@ -210,8 +209,9 @@
   #winbar{display:none;-webkit-app-region:drag;height:41px;align-items:center;justify-content:flex-end;
     background:#eef2f8;border-bottom:1px solid var(--line);padding:0 6px}
   #winbar.on{display:flex}
-  .winbtns{margin-left:auto;display:flex;align-items:center;gap:2px;align-self:center;margin-right:4px;padding-top:2px}
-  .winbtns.inTabs{align-self:center;margin-top:3px}
+  .winbtns{margin-left:auto;display:flex;align-items:center;gap:2px;margin-right:4px;-webkit-app-region:no-drag}
+  .winbtns.inTabs{margin-top:-5px}
+  .winbtns.inBar{margin-top:1px}
 </style>
 
 <div class="app">
