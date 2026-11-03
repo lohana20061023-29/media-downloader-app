@@ -173,7 +173,7 @@ function renderTabs() {
   };
 
   const home = h('div', { className: 'tab' + (S.activeId === S.homeId ? ' on' : '') },
-    svg('M4 10.5 12 4l8 6.5M6.5 9.5V20h11V9.5'),
+    svg('M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z'),
     h('span', { className: 't' }, '主页'),
   );
   home.onclick = () => activate(S.homeId);
