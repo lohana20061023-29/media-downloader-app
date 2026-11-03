@@ -72,9 +72,14 @@ async function boot() {
 
   for (const v of ['browse', 'downloads', 'history', 'settings']) $('nav-' + v).onclick = () => setView(v);
 
-  $('winMin').onclick = () => window.api.winMin();
-  $('winMax').onclick = () => window.api.winMax();
-  $('winClose').onclick = () => window.api.winClose();
+  for (const b of document.querySelectorAll('[data-win]')) {
+    b.onclick = () => {
+      const act = b.dataset.win;
+      if (act === 'min') window.api.winMin();
+      else if (act === 'max') window.api.winMax();
+      else window.api.winClose();
+    };
+  }
 
   /* 提示框点开 → 总是新开一个标签页，不覆盖当前页 */
   window.api.onOpenUrl((url) => {
@@ -275,6 +280,7 @@ function setView(v, keepTab) {
   $('workspace').hidden = !isBrowse;
   $('page').hidden = isBrowse;
   $('tabs').hidden = !isBrowse;
+  $('winbar').classList.toggle('on', !isBrowse);
 
   if (isBrowse) { renderSide(); renderTabs(); }
   else renderPage();

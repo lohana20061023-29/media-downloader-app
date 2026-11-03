@@ -205,6 +205,12 @@
   .winbtns button svg{width:18px;height:18px;stroke:currentColor;fill:none;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
   .winbtns button:hover{background:#dde5f1;color:var(--ink)}
   .winbtns button.close:hover{background:#e81123;color:#fff}
+  /* 非浏览页顶部的标题条（只放窗口按钮，可拖动） */
+  #winbar{display:none;-webkit-app-region:drag;height:34px;align-items:center;justify-content:flex-end;
+    background:#eef2f8;border-bottom:1px solid var(--line);padding:0 6px}
+  #winbar.on{display:flex}
+  .winbtns{margin-left:auto;display:flex;align-items:center;gap:2px;align-self:center;margin-right:4px}
+  .winbtns.inTabs{margin-top:-2px;align-self:flex-start}
 </style>
 
 <div class="app">
@@ -229,12 +235,17 @@
   </div>
 
   <div class="main">
+    <div id="winbar"><div class="winbtns inBar">
+        <button data-win="min" title="最小化"><svg viewBox="0 0 24 24"><path d="M5 12h14"/></svg></button>
+        <button data-win="max" title="最大化"><svg viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="1.5"/></svg></button>
+        <button data-win="close" class="close" title="关闭"><svg viewBox="0 0 24 24"><path d="M7 7l10 10M17 7L7 17"/></svg></button>
+      </div></div>
     <div class="tabs" id="tabs">
       <div class="tablist" id="tablist"></div>
-      <div class="winbtns">
-        <button id="winMin" title="最小化"><svg viewBox="0 0 24 24"><path d="M5 12h14"/></svg></button>
-        <button id="winMax" title="最大化"><svg viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="1.5"/></svg></button>
-        <button id="winClose" class="close" title="关闭"><svg viewBox="0 0 24 24"><path d="M7 7l10 10M17 7L7 17"/></svg></button>
+      <div class="winbtns inTabs">
+        <button data-win="min" title="最小化"><svg viewBox="0 0 24 24"><path d="M5 12h14"/></svg></button>
+        <button data-win="max" title="最大化"><svg viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="1.5"/></svg></button>
+        <button data-win="close" class="close" title="关闭"><svg viewBox="0 0 24 24"><path d="M7 7l10 10M17 7L7 17"/></svg></button>
       </div>
     </div>
     <div class="toolbar" id="toolbar">
