@@ -389,12 +389,34 @@ ipcMain.handle('browse-add', (_e, item) => {
 function cleanUrl(u) {
   try {
     const url = new URL(u);
-    for (const k of ['vd_source', 'share_source', 'share_medium', 'share_plat', 'share_tag', 'spm_id_from', 'trackid', 'unique_k', 'from_source', 'from_spmid', 'timestamp', 'buvid', 'up_id', 'broadcast_type', 'is_room_feed']) {
+    const host = url.hostname.replace(/^www\./, '');
+    const keep = {};
+
+    /* 各站点只保留真正区分内容的参数 */
+    const KEEP = {
+      'youtube.com': ['v', 'list', 'index', 't'],
+      'youtu.be': ['t'],
+      'bilibili.com': ['p'],
+      'twitter.com': [],
+      'x.com': [],
+      'douyin.com': [],
+      'xiaohongshu.com': ['xsec_token'],
+    };
+    const keys = KEEP[host] || null;
+    if (keys) {
+      for (const k of keys) if (url.searchParams.has(k)) keep[k] = url.searchParams.get(k);
+      const q = new URLSearchParams(keep).toString();
+      return url.origin + url.pathname + (q ? '?' + q : '');
+    }
+
+    /* 其它站点：只删掉明确的跟踪参数 */
+    for (const k of ['vd_source', 'share_source', 'share_medium', 'share_plat', 'share_tag', 'spm_id_from', 'trackid', 'unique_k', 'from_source', 'from_spmid', 'timestamp', 'buvid', 'up_id', 'broadcast_type', 'is_room_feed', 'feature', 'si', 'pp']) {
       url.searchParams.delete(k);
     }
     return url.origin + url.pathname + (url.search || '');
   } catch { return u; }
 }
+
 
 ipcMain.handle('browse-set-title', (_e, payload) => {
   const url = payload && payload.url;
