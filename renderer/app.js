@@ -72,6 +72,10 @@ async function boot() {
 
   for (const v of ['browse', 'downloads', 'history', 'settings']) $('nav-' + v).onclick = () => setView(v);
 
+  $('winMin').onclick = () => window.api.winMin();
+  $('winMax').onclick = () => window.api.winMax();
+  $('winClose').onclick = () => window.api.winClose();
+
   /* 提示框点开 → 总是新开一个标签页，不覆盖当前页 */
   window.api.onOpenUrl((url) => {
     S.view = 'browse';
@@ -159,9 +163,9 @@ function closeTab(id) {
 }
 
 function renderTabs() {
-  const box = $('tabs');
+  const box = $('tablist');
   box.replaceChildren();
-  box.hidden = S.view !== 'browse';
+  $('tabs').hidden = S.view !== 'browse';
 
   const svg = (d) => {
     const el = document.createElementNS('http://www.w3.org/2000/svg', 'svg');

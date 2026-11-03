@@ -89,7 +89,7 @@ let tray = null;
 function createMain() {
   mainWin = new BrowserWindow({
     width: 1180, height: 820, minWidth: 1000, minHeight: 680,
-    title: 'LoDown', backgroundColor: '#f6f2ea', show: false,
+    title: 'LoDown', backgroundColor: '#f2f4f7', show: false, frame: false,
     autoHideMenuBar: true,
     webPreferences: { preload: join(__dirname, 'preload.cjs'), contextIsolation: true, nodeIntegration: false, webviewTag: true },
   });
@@ -195,6 +195,14 @@ async function startDownload({ url, info, pick }) {
 }
 
 /* ── IPC ─────────────────────────────────────────────── */
+ipcMain.handle('win-min', () => { if (mainWin) mainWin.minimize(); });
+ipcMain.handle('win-max', () => {
+  if (!mainWin) return false;
+  if (mainWin.isMaximized()) mainWin.unmaximize(); else mainWin.maximize();
+  return mainWin.isMaximized();
+});
+ipcMain.handle('win-close', () => { app.isQuitting = true; if (mainWin) mainWin.close(); });
+
 ipcMain.handle('bootstrap', async () => {
   const e = await loadEngine();
   const me = await e.bili.loginStatus().catch(() => ({ login: false, uname: '', face: '' }));

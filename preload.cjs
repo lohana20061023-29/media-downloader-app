@@ -1,6 +1,9 @@
 ﻿const { contextBridge, ipcRenderer } = require('electron');
 
 contextBridge.exposeInMainWorld('api', {
+  winMin: () => ipcRenderer.invoke('win-min'),
+  winMax: () => ipcRenderer.invoke('win-max'),
+  winClose: () => ipcRenderer.invoke('win-close'),
   bootstrap: () => ipcRenderer.invoke('bootstrap'),
   probe: (url) => ipcRenderer.invoke('probe', url),
   start: (payload) => ipcRenderer.invoke('start', payload),

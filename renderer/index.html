@@ -196,6 +196,15 @@
   .hcard:hover .del{opacity:1}
   .hcard .del:hover{border-color:#e0b4b4;background:#fff5f5;color:var(--bad)}
   .histWrap{max-width:1020px;margin:0 auto}
+  /* 无边框：标签栏可拖动，按钮可点 */
+  .tabs{-webkit-app-region:drag;align-items:center;padding:6px 6px 0 8px;display:flex}
+  .tablist{display:flex;align-items:flex-end;gap:4px;flex:1;min-width:0;overflow-x:auto}
+  .tabs .tab,.tabs .add,.tabs .winbtns{-webkit-app-region:no-drag}
+  .winbtns{margin-left:auto;display:flex;align-items:center;gap:2px;align-self:flex-start;margin-top:-2px}
+  .winbtns button{width:34px;height:28px;display:flex;align-items:center;justify-content:center;background:none;border:none;border-radius:6px;color:var(--sub);cursor:pointer;padding:0}
+  .winbtns button svg{width:14px;height:14px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+  .winbtns button:hover{background:#dde5f1;color:var(--ink)}
+  .winbtns button.close:hover{background:#e81123;color:#fff}
 </style>
 
 <div class="app">
@@ -220,7 +229,14 @@
   </div>
 
   <div class="main">
-    <div class="tabs" id="tabs"></div>
+    <div class="tabs" id="tabs">
+      <div class="tablist" id="tablist"></div>
+      <div class="winbtns">
+        <button id="winMin" title="最小化"><svg viewBox="0 0 24 24"><path d="M5 12h14"/></svg></button>
+        <button id="winMax" title="最大化"><svg viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="1.5"/></svg></button>
+        <button id="winClose" class="close" title="关闭"><svg viewBox="0 0 24 24"><path d="M7 7l10 10M17 7L7 17"/></svg></button>
+      </div>
+    </div>
     <div class="toolbar" id="toolbar">
       <div class="navgroup">
         <button class="nav" id="back" title="后退">
