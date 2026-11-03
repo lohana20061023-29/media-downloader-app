@@ -53,7 +53,7 @@ async function boot() {
   $('back').onclick = () => { const t = active(); try { t?.wv.goBack(); } catch {} };
   $('forward').onclick = () => { const t = active(); try { t?.wv.goForward(); } catch {} };
   $('reload').onclick = () => { const t = active(); try { t?.wv.reload(); } catch {} };
-  $('download').onclick = () => { const t = active(); if (t?.url) parseTab(t, false); };
+  if ($('download')) $('download').onclick = () => { const t = active(); if (t?.url) parseTab(t, false); };
   $('paneltoggle').onclick = () => {
     const t = active();
     if (!t) return;
@@ -137,7 +137,7 @@ function activate(id) {
   for (const t of S.tabs) if (t.wv) t.wv.classList.toggle('on', t.id === id);
   const isHome = id === S.homeId;
   $('startpage').style.display = isHome ? '' : 'none';
-  $('download').disabled = isHome || !SUPPORTED.test(active()?.url || '');
+  if ($('download')) $('download').disabled = isHome || !SUPPORTED.test(active()?.url || '');
   $('addr').value = isHome ? '' : (active()?.url || '');
 
   setView('browse', true);
@@ -205,7 +205,7 @@ async function onNavigate(tab, url) {
   try { tab.title = tab.wv.getTitle() || url.replace(/^https?:\/\//,'').replace(/\/$/,''); } catch { tab.title = url; }
   if (tab.id === S.activeId) {
     $('addr').value = url;
-    $('download').disabled = !SUPPORTED.test(url);
+  if ($('download')) $('download').disabled = !SUPPORTED.test(url);
   }
   renderTabs();
   S.history = await window.api.browseAdd({ url, title: tab.title || url });
@@ -347,7 +347,7 @@ function renderSide() {
     const m = h('input', { type: 'checkbox' }); m.checked = pick.audioMp3;
     m.onchange = (e) => { pick.audioMp3 = e.target.checked; };
     box.append(h('div', { className: 'sec' }, h('h4', {}, '音频'),
-      h('div', { className: 'opts' }, h('label', { className: 'chk' }, a, '额外音频'), h('label', { className: 'chk' }, m, '转 MP3'))));
+      h('div', { className: 'opts' }, h('label', { className: 'chk' }, a, '独立音频'), h('label', { className: 'chk' }, m, '转 MP3'))));
   }
 
   if (info.covers?.length || info.up?.face) {
@@ -385,27 +385,34 @@ function renderSide() {
     box.append(h('div', { className: 'sec' }, h('h4', {}, `图文 · ${info.images.length} 张`), picks));
   }
 
+  /* 底部固定：下载此页（未解析时按钮变为解析） */
+  const foot = h('div', { className: 'sideFoot' });
+  const pageBtn = h('button', {}, info ? '下载此页' : '解析此页');
+  pageBtn.onclick = () => { if (tab.info) startDownload(tab); else parseTab(tab, false); };
+  foot.append(pageBtn);
+  box.append(foot);
+
 }
 
 /* ── 解析 ── */
 async function parseTab(tab, auto) {
   const dl = $('download');
-  if (!auto) { dl.disabled = true; dl.textContent = '解析中…'; }
+  if (dl && !auto) { dl.disabled = true; dl.textContent = '解析中…'; }
   try {
     const info = await window.api.probe(tab.url);
     tab.info = info;
     tab.err = '';
     tab.pick = {
       videoQn: info.videos?.[0]?.qn ?? null,
-      audio: true, audioId: null, audioMp3: true,
+      audio: false, audioId: null, audioMp3: true,
       coverIds: [], avatar: false, imageIds: [],
     };
   } catch (e) {
     tab.err = e.message || String(e);
     tab.info = null;
   } finally {
-    dl.textContent = '下载此页';
-    dl.disabled = false;
+    if (dl) { dl.textContent = '下载此页'; dl.disabled = false; }
+
   }
   if (tab.id === S.activeId) renderSide();
 }
