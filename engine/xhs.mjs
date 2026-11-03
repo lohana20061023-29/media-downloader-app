@@ -147,6 +147,7 @@ function extractVideos(note) {
   const direct = note?.video?.url || note?.video?.media?.video?.url || note?.video?.media?.video?.masterUrl;
   if (direct) push(direct, 0, '视频', 'AVC', 0, []);
 
+  out.sort((a, b) => (b.height || 0) - (a.height || 0));
   return out;
 }
 
@@ -243,7 +244,10 @@ async function probeBrowser(targetUrl, id) {
   await mkdir(ROOT, { recursive: true });
   const child = spawn(exe, [
     `--user-data-dir=${PROFILE}`, `--remote-debugging-port=${PORT}`,
-    '--no-first-run', '--no-default-browser-check', '--new-window', targetUrl,
+    '--no-first-run', '--no-default-browser-check',
+    '--headless=new', '--window-size=1280,900', '--disable-gpu',
+    '--disable-blink-features=AutomationControlled',
+    targetUrl,
   ], { stdio: 'ignore', windowsHide: false });
 
   const cleanup = () => {
@@ -269,6 +273,7 @@ async function probeBrowser(targetUrl, id) {
           noteId: note.noteId, type: note.type, title: note.title, desc: note.desc,
           user: { nickName: note.user?.nickname || '', avatar: note.user?.avatar || '' },
           imageList: (note.imageList || []).map((i) => ({ urlDefault: i.urlDefault || i.url, infoList: i.infoList })),
+          video: note.video || null,
         } };
       } catch (e) { return { ready: false }; }
     })()`;
