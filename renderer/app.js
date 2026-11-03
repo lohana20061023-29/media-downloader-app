@@ -123,6 +123,16 @@ function newTab(url) {
       if (/^https?:/i.test(e.url)) { S.view = 'browse'; newTab(e.url); }
     }
   });
+  wv.addEventListener('did-stop-loading', () => {
+    try {
+      const t = wv.getTitle();
+      if (t && t !== tab.title) {
+        tab.title = t;
+        renderTabs();
+        if (tab.url) window.api.browseSetTitle({ url: tab.url, title: t }).then((l) => { S.history = l; }).catch(() => {});
+      }
+    } catch {}
+  });
   wv.addEventListener('page-favicon-updated', (e) => {
     if (e.favicons && e.favicons[0]) { tab.icon = e.favicons[0]; renderTabs(); }
   });
