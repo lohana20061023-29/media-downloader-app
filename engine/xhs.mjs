@@ -237,18 +237,26 @@ async function waitPort(port, tries = 100) {
   return false;
 }
 
-async function probeBrowser(targetUrl, id) {
+async function probeOnce(targetUrl, id, headless) {
   const exe = BROWSERS.find((p) => existsSync(p));
   if (!exe) throw new Error('需要 Edge 或 Chrome 才能读取小红书');
 
   await mkdir(ROOT, { recursive: true });
-  const child = spawn(exe, [
+  const args = [
     `--user-data-dir=${PROFILE}`, `--remote-debugging-port=${PORT}`,
     '--no-first-run', '--no-default-browser-check',
-    '--headless=new', '--window-size=1280,900', '--disable-gpu',
+    '--window-size=1280,900', '--disable-gpu',
     '--disable-blink-features=AutomationControlled',
-    targetUrl,
-  ], { stdio: 'ignore', windowsHide: false });
+  ];
+  if (headless) {
+    args.push('--headless=new');
+  } else {
+    /* 有头但不打扰：窗口挪到屏幕外 */
+    args.push('--window-position=-32000,-32000', '--window-size=800,600');
+  }
+  args.push(targetUrl);
+
+  const child = spawn(exe, args, { stdio: 'ignore', windowsHide: !headless });
 
   const cleanup = () => {
     try { child.kill(); } catch { /* ignore */ }
@@ -265,43 +273,58 @@ async function probeBrowser(targetUrl, id) {
     const expr = `(() => {
       try {
         const map = window.__INITIAL_STATE__?.note?.noteDetailMap;
-        if (!map) return { ready: false };
+        if (!map) return { ready: false, hasWall: false };
         const entry = map['${id}'];
         const note = entry?.note || entry;
-        if (!note || !note.noteId) return { ready: false };
+        if (!note || !note.noteId) return { ready: false, hasWall: false };
         return { ready: true, note: {
           noteId: note.noteId, type: note.type, title: note.title, desc: note.desc,
           user: { nickName: note.user?.nickname || '', avatar: note.user?.avatar || '' },
           imageList: (note.imageList || []).map((i) => ({ urlDefault: i.urlDefault || i.url, infoList: i.infoList })),
           video: note.video || null,
         } };
-      } catch (e) { return { ready: false }; }
+      } catch (e) { return { ready: false, hasWall: false }; }
     })()`;
 
     let note = null;
     let wallHit = false;
-    let deadline = Date.now() + 25000;
+    const deadline = Date.now() + 12000;
     const wallExpr = `(() => /需手机扫码|笔记暂时无法浏览|安全验证|请完成验证/.test(document.body ? document.body.innerText : ''))()`;
 
-    for (let i = 0; Date.now() < deadline; i++) {
-      const r = await send('Runtime.evaluate', { expression: expr, returnByValue: true });
-      const v = r.result?.result?.value;
-      if (v?.ready && v.note) { note = v.note; break; }
-      if (!wallHit && i % 2 === 1) {
+    while (Date.now() < deadline) {
+      const res = await send('Runtime.evaluate', { expression: expr, returnByValue: true });
+      const value = res?.result?.value;
+      if (value && value.ready) { note = value.note; break; }
+      if (!wallHit) {
         const w = await send('Runtime.evaluate', { expression: wallExpr, returnByValue: true });
-        if (w.result?.result?.value === true) { wallHit = true; deadline = Date.now() + 150000; }
+        if (w?.result?.value) wallHit = true;
       }
-      await sleep(500);
+      await new Promise((r) => setTimeout(r, 700));
     }
+
     ws.close();
-    if (!note) throw new Error(wallHit
-      ? '小红书要求手机扫码验证：请在刚弹出的窗口里扫码，通过后再点一次「解析」'
-      : '页面里没等到笔记数据，可能登录态失效');
+    if (!note) throw new Error(wallHit ? '需要人工验证' : '页面里没等到笔记数据');
     return normalize(note, id, null);
   } finally {
     cleanup();
   }
 }
+
+async function probeBrowser(targetUrl, id) {
+  /* 先无头（不弹窗）；失败再换「离屏有头」（不遮挡屏幕但更像真人） */
+  try {
+    return await probeOnce(targetUrl, id, true);
+  } catch (first) {
+    try {
+      return await probeOnce(targetUrl, id, false);
+    } catch (second) {
+      throw new Error(second.message === '需要人工验证'
+        ? '小红书要求手机扫码验证：请在刚弹出的窗口里扫码，通过后再点一次「解析」'
+        : first.message);
+    }
+  }
+}
+
 
 /* ── 对外 ──────────────────────────────────────────────────────────── */
 

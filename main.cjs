@@ -50,7 +50,7 @@ function bundledFfmpeg() {
    写进 ~/.dsh/bili-dl/cookies.txt（插件用的同一个文件），
    yt-dlp 走 --cookies，抖音走 MEDIADL_COOKIE_FILE。 */
 /* 只保留真正需要登录的平台：抖音/小红书解析靠匿名或浏览器，Vimeo 用不上 */
-const LOGIN_ALLOW = ['youtube', 'bilibili', 'twitter', 'tiktok'];
+const LOGIN_ALLOW = ['youtube', 'bilibili', 'twitter', 'tiktok', 'xiaohongshu'];
 
 function wireCookieConsumers(e) {
   try {
