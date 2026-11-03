@@ -210,7 +210,9 @@ async function onNavigate(tab, url) {
   if ($('download')) $('download').disabled = !SUPPORTED.test(url);
   }
   renderTabs();
-  S.history = await window.api.browseAdd({ url, title: tab.title || url });
+  let icon = '';
+  try { icon = tab.wv.getFavicon() || ''; } catch {}
+  S.history = await window.api.browseAdd({ url, title: tab.title || url, icon });
 
   if (SUPPORTED.test(url)) {
     tab.info = null; tab.err = ''; tab.panelOpen = true;
@@ -585,24 +587,36 @@ function renderHistory(box) {
 
   for (const [label, items] of groups) {
     box.append(h('div', { className: 'hdate' }, label));
-    const g = h('div', { className: 'hwrap' });
+
     for (const it of items) {
+      let host = '';
+      try { host = new URL(it.url).hostname.replace(/^www\./, ''); } catch {}
+      const iconUrl = it.icon || (host ? 'https://' + host + '/favicon.ico' : '');
+
       const del = h('span', { className: 'del', title: '删除这条' }, '×');
-      del.onclick = async (e) => {
-        e.stopPropagation();
-        S.history = await window.api.browseRemove(it.url);
-        renderPage();
-      };
-      const row = h('div', { className: 'hrow', title: it.url },
-        h('span', { className: 'nm' }, it.title || it.url),
-        h('span', { className: 'u' }, it.url.replace(/^https?:\/\//, '').slice(0, 60)),
-        h('span', { className: 'tm2' }, new Date(it.at).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })),
+      del.onclick = async (e) => { e.stopPropagation(); S.history = await window.api.browseRemove(it.url); renderPage(); };
+
+      const when = new Date(it.at);
+      const stamp = when.getFullYear() + '/' + String(when.getMonth() + 1).padStart(2, '0') + '/' +
+        String(when.getDate()).padStart(2, '0') + ' ' + String(when.getHours()).padStart(2, '0') + ':' + String(when.getMinutes()).padStart(2, '0');
+
+      const row = h('div', { className: 'hcard', title: it.url },
+        h('img', {
+          className: 'fav',
+          src: iconUrl,
+          referrerPolicy: 'no-referrer',
+          onerror: (e) => { e.target.style.visibility = 'hidden'; },
+        }),
+        h('div', { className: 'ht' },
+          h('div', { className: 'nm' }, it.title || it.url),
+          h('div', { className: 'u' }, it.url),
+        ),
+        h('span', { className: 'tm2' }, stamp),
         del,
       );
       row.onclick = () => { setView('browse', true); newTab(it.url); };
-      g.append(row);
+      box.append(row);
     }
-    box.append(g);
   }
 }
 

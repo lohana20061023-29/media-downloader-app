@@ -363,7 +363,7 @@ ipcMain.handle('browse-list', () => Array.isArray(state.browse) ? state.browse :
 ipcMain.handle('browse-add', (_e, item) => {
   if (!item || !item.url || !/^https?:/i.test(item.url)) return Array.isArray(state.browse) ? state.browse : [];
   const list = (Array.isArray(state.browse) ? state.browse : []).filter((x) => x.url !== item.url);
-  const next = [{ url: item.url, title: (item.title || item.url).slice(0, 200), at: Date.now() }, ...list].slice(0, 500);
+  const next = [{ url: item.url, title: (item.title || item.url).slice(0, 200), icon: item.icon || '', at: Date.now() }, ...list].slice(0, 500);
   saveState({ browse: next });
   return next;
 });
