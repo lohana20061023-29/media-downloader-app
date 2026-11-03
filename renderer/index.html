@@ -132,8 +132,8 @@
   .lm webview{flex:1;border:0;background:#fff}
   /* 下载按钮 + 分辨率下拉 */
   .dlbar{display:flex;gap:6px;margin-bottom:10px}
-  .dlbar .main{flex:1;height:38px;display:flex;align-items:center;justify-content:center;gap:7px;padding:0 10px;line-height:1;font-size:13.5px;text-align:center}
-  .dlbar .main svg{width:16px;height:16px;stroke:#fff;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+  .dlbar .main{flex:1;height:38px;display:flex;flex-direction:row;flex-wrap:nowrap;white-space:nowrap;align-items:center;justify-content:center;gap:7px;padding:0 10px;line-height:1;font-size:13.5px;text-align:center}
+  .dlbar .main svg{width:16px;height:16px;flex:0 0 auto;stroke:#fff;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
   .dlbar .caret{width:46px;height:38px;display:flex;align-items:center;justify-content:center;background:var(--accent);border-radius:9px;cursor:pointer;border:none;padding:0}
   .dlbar .caret svg{width:19px;height:19px;stroke:#fff;fill:none;stroke-width:2.4;stroke-linecap:round;stroke-linejoin:round;transition:transform .15s}
   .dlbar .caret.open svg{transform:rotate(180deg)}
