@@ -388,17 +388,25 @@ function cleanUrl(u) {
 }
 
 ipcMain.handle('browse-set-title', (_e, payload) => {
+  const url = payload && payload.url;
+  const title = payload && payload.title;
+  if (!url || !title) return Array.isArray(state.browse) ? state.browse : [];
+
+  const clean = cleanUrl(url);
   const list = Array.isArray(state.browse) ? state.browse : [];
-  const clean = cleanUrl(payload && payload.url || '');
-  let changed = false;
-  for (const it of list) {
-    if (cleanUrl(it.url) === clean && payload.title && it.title !== payload.title) {
-      it.title = String(payload.title).slice(0, 200);
-      changed = true;
-      break;
+  const idx = list.findIndex((it) => cleanUrl(it.url) === clean);
+
+  if (idx >= 0) {
+    if (list[idx].title !== title) {
+      list[idx].title = String(title).slice(0, 200);
+      if (payload.icon) list[idx].icon = payload.icon;
+      saveState({ browse: list });
     }
+  } else {
+    /* 标题事件比 browse-add 先到：直接补一条 */
+    list.unshift({ url: clean, title: String(title).slice(0, 200), icon: payload.icon || '', at: Date.now() });
+    saveState({ browse: list.slice(0, 500) });
   }
-  if (changed) saveState({ browse: list });
   return list;
 });
 

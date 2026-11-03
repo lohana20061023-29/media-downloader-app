@@ -247,6 +247,19 @@ async function onNavigate(tab, url) {
   try { icon = tab.wv.getFavicon() || tab.icon || ''; } catch { icon = tab.icon || ''; }
   if (icon) tab.icon = icon;
 
+  /* SPA 内跳转常常不发标题事件：两个时间点各补抓一次 */
+  clearTimeout(tab.titleTimer);
+  tab.titleTimer = setTimeout(async () => {
+    try {
+      const t = tab.wv.getTitle();
+      if (t && t !== tab.title) {
+        tab.title = t;
+        renderTabs();
+        S.history = await window.api.browseSetTitle({ url: tab.url, title: t, icon: tab.icon || '' });
+      }
+    } catch {}
+  }, 1500);
+
   /* 写浏览记录（标题先用当前拿到的，页面标题定稿后由 page-title-updated 回写） */
   try {
     S.history = await window.api.browseAdd({ url, title: tab.title || url, icon });
