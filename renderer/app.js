@@ -575,6 +575,9 @@ function renderHistory(box) {
     return;
   }
 
+  /* 整体外框 */
+  const wrap = h('div', { className: 'hwrap' });
+
   /* 按日期分组 */
   const groups = new Map();
   for (const it of list) {
@@ -601,8 +604,10 @@ function renderHistory(box) {
       row.onclick = () => { setView('browse', true); newTab(it.url); };
       g.append(row);
     }
-    box.append(g);
+    wrap.append(g);
   }
+
+  box.append(wrap);
 }
 
 function renderSettings(box) {
