@@ -114,6 +114,9 @@ function newTab(url) {
       if (/^https?:/i.test(e.url)) { S.view = 'browse'; newTab(e.url); }
     }
   });
+  wv.addEventListener('page-favicon-updated', (e) => {
+    if (e.favicons && e.favicons[0]) { tab.icon = e.favicons[0]; renderTabs(); }
+  });
   wv.addEventListener('did-navigate', (e) => onNavigate(tab, e.url));
   wv.addEventListener('did-navigate-in-page', (e) => onNavigate(tab, e.url));
   wv.addEventListener('page-title-updated', () => {
@@ -178,7 +181,18 @@ function renderTabs() {
 
   for (const t of S.tabs) {
     const el = h('div', { className: 'tab' + (t.id === S.activeId ? ' on' : '') },
-      svg('M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18zM3 12h18M12 3c2.5 2.5 2.5 15 0 18M12 3c-2.5 2.5-2.5 15 0 18'),
+      (() => {
+        let host = '';
+        try { host = t.url ? new URL(t.url).hostname : ''; } catch {}
+        const src = t.icon || (host ? 'https://' + host + '/favicon.ico' : '');
+        if (!src) return svg('M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18zM3 12h18M12 3c2.5 2.5 2.5 15 0 18M12 3c-2.5 2.5-2.5 15 0 18');
+        const img = h('img', { className: 'favicon', src, referrerPolicy: 'no-referrer' });
+        img.onerror = () => {
+          if (host && !img.dataset.fb) { img.dataset.fb = '1'; img.src = 'https://www.google.com/s2/favicons?domain=' + host + '&sz=32'; }
+          else img.style.visibility = 'hidden';
+        };
+        return img;
+      })(),
       h('span', { className: 't' }, t.title || t.url || '新标签页'),
       (() => { const x = h('span', { className: 'x' }, '×'); x.onclick = (e) => { e.stopPropagation(); closeTab(t.id); }; return x; })(),
     );
@@ -211,8 +225,8 @@ async function onNavigate(tab, url) {
   }
   renderTabs();
   let icon = '';
-  try { icon = tab.wv.getFavicon() || ''; } catch {}
-  S.history = await window.api.browseAdd({ url, title: tab.title || url, icon });
+  try { icon = tab.wv.getFavicon() || tab.icon || ''; } catch { icon = tab.icon || ''; }
+  if (icon) tab.icon = icon;
 
   if (SUPPORTED.test(url)) {
     tab.info = null; tab.err = ''; tab.panelOpen = true;
