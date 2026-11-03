@@ -575,10 +575,7 @@ function renderHistory(box) {
     return;
   }
 
-  /* 整体外框 */
-  const wrap = h('div', { className: 'hwrap' });
-
-  /* 按日期分组 */
+  /* 按日期分组：每天一个独立框，日期标签在框外 */
   const groups = new Map();
   for (const it of list) {
     const key = dayLabel(it.at);
@@ -587,7 +584,8 @@ function renderHistory(box) {
   }
 
   for (const [label, items] of groups) {
-    const g = h('div', { className: 'hgroup' }, h('div', { className: 'hdate' }, label));
+    box.append(h('div', { className: 'hdate' }, label));
+    const g = h('div', { className: 'hwrap' });
     for (const it of items) {
       const del = h('span', { className: 'del', title: '删除这条' }, '×');
       del.onclick = async (e) => {
@@ -604,10 +602,8 @@ function renderHistory(box) {
       row.onclick = () => { setView('browse', true); newTab(it.url); };
       g.append(row);
     }
-    wrap.append(g);
+    box.append(g);
   }
-
-  box.append(wrap);
 }
 
 function renderSettings(box) {
