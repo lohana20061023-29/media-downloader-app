@@ -1,6 +1,7 @@
 ﻿const { contextBridge, ipcRenderer } = require('electron');
 
 contextBridge.exposeInMainWorld('api', {
+  debugLog: (line) => ipcRenderer.invoke('debug-log', line),
   winMin: () => ipcRenderer.invoke('win-min'),
   winMax: () => ipcRenderer.invoke('win-max'),
   winClose: () => ipcRenderer.invoke('win-close'),

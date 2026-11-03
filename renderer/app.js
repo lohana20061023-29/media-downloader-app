@@ -95,18 +95,36 @@ async function boot() {
     if (S.view === 'settings') renderPage();
   });
 
-  /* 标题轮询：每秒读一次当前标签的真实标题（站内跳转不一定发事件） */
+  /* 标题轮询：每秒读一次当前标签的标题。
+     站内跳转时 document.title 常常不更新，所以依次尝试：页面 h1 → og:title → document.title */
+  /* 标题轮询：每秒探测一次当前标签页，站点标题没跟着换时用 h1 / og:title 兜底 */
   S.titlePoll = setInterval(async () => {
     const tab = active();
     if (!tab || !tab.wv || !tab.ready || S.view !== 'browse') return;
     try {
-      const t = await tab.wv.executeJavaScript('document.title');
+      const code = [
+        '(function(){',
+        "var h=document.querySelector('h1');",
+        'var m=document.querySelector(\'meta[property="og:title"]\');',
+        "return JSON.stringify({u:location.href,t:document.title,h:(h&&h.innerText||'').trim(),o:(m&&m.content)||''});",
+        '})()',
+      ].join('');
+      const raw = await tab.wv.executeJavaScript(code);
+      const info = JSON.parse(raw || '{}');
+      const t = (info.h && info.h.length > 2 && info.h.length < 120) ? info.h : (info.o || info.t || '');
+      const stamp = info.u + '|' + info.t + '|' + info.h + '|' + info.o;
+      if (stamp !== S.lastProbe) {
+        S.lastProbe = stamp;
+        window.api.debugLog('PROBE ' + stamp + ' || tab=' + tab.title).catch(() => {});
+      }
       if (t && t !== tab.title) {
         tab.title = t;
         renderTabs();
         S.history = await window.api.browseSetTitle({ url: tab.url, title: t, icon: tab.icon || '' });
       }
-    } catch { }
+    } catch (e) {
+      window.api.debugLog('ERR ' + (e && e.message)).catch(() => {});
+    }
   }, 1000);
 
   activate(S.homeId);

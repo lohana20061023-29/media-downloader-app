@@ -195,6 +195,15 @@ async function startDownload({ url, info, pick }) {
 }
 
 /* ── IPC ─────────────────────────────────────────────── */
+ipcMain.handle('debug-log', (_e, line) => {
+  try {
+    const path = require('node:path');
+    const fs = require('node:fs');
+    const file = path.join(require('node:os').tmpdir(), 'lodown-debug.log');
+    fs.appendFileSync(file, new Date().toISOString() + ' ' + String(line).slice(0, 800) + '\n', 'utf8');
+  } catch {}
+});
+
 ipcMain.handle('win-min', () => { if (mainWin) mainWin.minimize(); });
 ipcMain.handle('win-max', () => {
   if (!mainWin) return false;
