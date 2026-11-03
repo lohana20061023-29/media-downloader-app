@@ -13,6 +13,8 @@ let S = {
   sites: [],
   sessionHint: '',
   dlFilter: 'all',
+  dlTime: 'all',
+  histTime: 'all',
 };
 
 const $ = (id) => document.getElementById(id);
@@ -456,6 +458,56 @@ function statusOf(job) {
   return items.some((i) => i.status === 'running' || i.received > 0) ? 'running' : 'waiting';
 }
 
+const TIME_OPTIONS = [
+  ['all', '全部时间'],
+  ['today', '今天'],
+  ['yesterday', '昨天'],
+  ['7d', '最近 7 天'],
+  ['30d', '最近 30 天'],
+];
+
+function startOfDay(ts) {
+  const d = new Date(ts);
+  d.setHours(0, 0, 0, 0);
+  return d.getTime();
+}
+
+function inTimeRange(ts, key) {
+  if (!ts) return true;
+  const today = startOfDay(Date.now());
+  const day = startOfDay(ts);
+  if (key === 'today') return day === today;
+  if (key === 'yesterday') return day === today - 86400000;
+  if (key === '7d') return day >= today - 6 * 86400000;
+  if (key === '30d') return day >= today - 29 * 86400000;
+  return true;
+}
+
+function timeFilter(getVal, setVal) {
+  const wrap = h('div', { className: 'tfilter' });
+  const cur = TIME_OPTIONS.find(([k]) => k === getVal()) || TIME_OPTIONS[0];
+  const btn = h('div', { className: 'tb' + (S.tmOpen ? ' open' : '') }, cur[1]);
+  const caret = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  caret.setAttribute('viewBox', '0 0 24 24');
+  const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+  path.setAttribute('d', 'M6 9l6 6 6-6');
+  caret.append(path);
+  btn.append(caret);
+  btn.onclick = (e) => { e.stopPropagation(); S.tmOpen = !S.tmOpen; renderPage(); };
+
+  wrap.append(btn);
+  if (S.tmOpen) {
+    const menu = h('div', { className: 'tm' });
+    for (const [k, label] of TIME_OPTIONS) {
+      const item = h('div', { className: 'ti' + (k === getVal() ? ' on' : '') }, label);
+      item.onclick = (e) => { e.stopPropagation(); setVal(k); S.tmOpen = false; renderPage(); };
+      menu.append(item);
+    }
+    wrap.append(menu);
+  }
+  return wrap;
+}
+
 function renderPage() {
   const box = $('page');
   box.replaceChildren();
@@ -476,10 +528,10 @@ function renderDownloads(box) {
   }
   const clear = h('button', { className: 'ghost' }, '清除已结束');
   clear.onclick = () => { S.jobs = S.jobs.filter((j) => !['done', 'error'].includes(j.status)); renderPage(); };
-  segs.append(h('div', { className: 'right' }, clear));
+  segs.append(h('div', { className: 'right' }, timeFilter(() => S.dlTime, (v) => { S.dlTime = v; }), clear));
   box.append(segs);
 
-  const list = S.jobs.filter((j) => S.dlFilter === 'all' || statusOf(j) === S.dlFilter);
+  const list = S.jobs.filter((j) => (S.dlFilter === 'all' || statusOf(j) === S.dlFilter) && inTimeRange(j.at, S.dlTime));
   if (!list.length) {
     box.append(h('div', { className: 'empty' }, icon('M12 4v10m0 0l-4-4m4 4l4-4M5 18h14'), h('div', {}, '暂无下载')));
     return;
@@ -501,33 +553,56 @@ function renderDownloads(box) {
   }
 }
 
+function dayLabel(ts) {
+  const today = startOfDay(Date.now());
+  const day = startOfDay(ts);
+  if (day === today) return '今天';
+  if (day === today - 86400000) return '昨天';
+  const d = new Date(ts);
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+}
+
 function renderHistory(box) {
   const segs = h('div', { className: 'segs' }, h('div', { className: 'seg on' }, '浏览记录', h('span', { className: 'n' }, S.history.length)));
-  if (S.history.length) {
-    const clr = h('button', { className: 'ghost' }, '清空');
-    clr.onclick = async () => { S.history = await window.api.browseClear(); renderPage(); };
-    segs.append(h('div', { className: 'right' }, clr));
-  }
+  const clr = h('button', { className: 'ghost' }, '清空');
+  clr.onclick = async () => { S.history = await window.api.browseClear(); renderPage(); };
+  segs.append(h('div', { className: 'right' }, timeFilter(() => S.histTime, (v) => { S.histTime = v; }), clr));
   box.append(segs);
 
-  if (!S.history.length) { box.append(h('div', { className: 'empty' }, icon('M12 8v4l3 2M4 12a8 8 0 1 1 8 8'), h('div', {}, '还没有浏览记录'))); return; }
-
-  const card = h('div', { className: 'card' });
-  for (const it of S.history) {
-    const open = h('span', { className: 'lnk' }, '打开');
-    open.onclick = () => { setView('browse', true); newTab(it.url); };
-    const del = h('span', { className: 'lnk', style: 'color:var(--sub)' }, '删除');
-    del.onclick = async () => { S.history = await window.api.browseRemove(it.url); renderPage(); };
-    card.append(h('div', { className: 'item' },
-      h('div', { style: 'flex:1;min-width:0' },
-        h('div', { className: 'nm', style: 'font-weight:500' }, it.title || it.url),
-        h('div', { className: 'sub2' }, it.url.replace(/^https?:\/\//, '').slice(0, 80)),
-      ),
-      h('span', { className: 'pc', style: 'width:96px' }, fmtDate(it.at)),
-      open, del,
-    ));
+  const list = S.history.filter((it) => inTimeRange(it.at, S.histTime));
+  if (!list.length) {
+    box.append(h('div', { className: 'empty' }, icon('M12 8v4l3 2M4 12a8 8 0 1 1 8 8'), h('div', {}, '这个时间段没有记录')));
+    return;
   }
-  box.append(card);
+
+  /* 按日期分组 */
+  const groups = new Map();
+  for (const it of list) {
+    const key = dayLabel(it.at);
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(it);
+  }
+
+  for (const [label, items] of groups) {
+    const g = h('div', { className: 'hgroup' }, h('div', { className: 'hdate' }, label));
+    for (const it of items) {
+      const del = h('span', { className: 'del', title: '删除这条' }, '×');
+      del.onclick = async (e) => {
+        e.stopPropagation();
+        S.history = await window.api.browseRemove(it.url);
+        renderPage();
+      };
+      const row = h('div', { className: 'hrow', title: it.url },
+        h('span', { className: 'nm' }, it.title || it.url),
+        h('span', { className: 'u' }, it.url.replace(/^https?:\/\//, '').slice(0, 60)),
+        h('span', { className: 'tm2' }, new Date(it.at).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })),
+        del,
+      );
+      row.onclick = () => { setView('browse', true); newTab(it.url); };
+      g.append(row);
+    }
+    box.append(g);
+  }
 }
 
 function renderSettings(box) {
