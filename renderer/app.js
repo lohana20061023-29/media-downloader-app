@@ -478,27 +478,38 @@ async function parseTab(tab, auto) {
   try {
     let info = null;
 
-    /* 小红书：优先从当前浏览页直接读数据（真实会话，最不容易被风控） */
+    /* 小红书：从当前浏览页读数据。站内打开新笔记时 noteDetailMap 会同时有多条，
+       必须按当前地址里的 noteId 精确匹配，否则会拿到上一篇的媒体。 */
     if (/xiaohongshu\.com/.test(tab.url || '')) {
-      try {
-        const raw = await tab.wv.executeJavaScript(
-          "(function(){"
-          + "var m=window.__INITIAL_STATE__&&window.__INITIAL_STATE__.note&&window.__INITIAL_STATE__.note.noteDetailMap;"
-          + "if(!m)return '';"
-          + "var k=Object.keys(m)[0]; var e=m[k]; var n=e&&(e.note||e);"
-          + "if(!n||!n.noteId)return '';"
-          + "return JSON.stringify({id:n.noteId,note:{noteId:n.noteId,type:n.type,title:n.title,desc:n.desc,"
-          + "user:{nickName:(n.user&&n.user.nickname)||'',avatar:(n.user&&n.user.avatar)||''},"
-          + "imageList:(n.imageList||[]).map(function(i){return {urlDefault:i.urlDefault||i.url,infoList:i.infoList}}),"
-          + "video:n.video||null}});"
-          + "})()",
-        );
-        if (raw) {
-          const parsed = JSON.parse(raw);
-          const r = await window.api.xhsFromPage({ note: parsed.note, id: parsed.id });
-          if (r && r.ok) info = r.info;
-        }
-      } catch { /* 页面没数据就退回引擎 */ }
+      const m = /(?:explore|discovery\/item|item)\/([0-9a-f]{20,32})/i.exec(tab.url || '');
+      const wantId = m ? m[1] : '';
+      for (let attempt = 0; attempt < 6 && !info; attempt += 1) {
+        try {
+          const raw = await tab.wv.executeJavaScript(
+            "(function(want){"
+            + "var m=window.__INITIAL_STATE__&&window.__INITIAL_STATE__.note&&window.__INITIAL_STATE__.note.noteDetailMap;"
+            + "if(!m)return '';"
+            + "var keys=Object.keys(m), pick='';"
+            + "if(want&&m[want])pick=want;"
+            + "if(!pick){for(var i=0;i<keys.length;i++){if(keys[i]===want){pick=keys[i];break;}}}"
+            + "if(!pick)return '';"
+            + "var e=m[pick], n=e&&(e.note||e);"
+            + "if(!n||!n.noteId)return '';"
+            + "if(want&&n.noteId!==want)return '';"
+            + "return JSON.stringify({id:n.noteId,note:{noteId:n.noteId,type:n.type,title:n.title,desc:n.desc,"
+            + "user:{nickName:(n.user&&n.user.nickname)||'',avatar:(n.user&&n.user.avatar)||''},"
+            + "imageList:(n.imageList||[]).map(function(i){return {urlDefault:i.urlDefault||i.url,infoList:i.infoList}}),"
+            + "video:n.video||null}});"
+            + "})(" + JSON.stringify(wantId) + ")",
+          );
+          if (raw) {
+            const parsed = JSON.parse(raw);
+            const r = await window.api.xhsFromPage({ note: parsed.note, id: parsed.id });
+            if (r && r.ok) info = r.info;
+          }
+        } catch { /* 继续重试 */ }
+        if (!info) await new Promise((res) => setTimeout(res, 400));
+      }
     }
 
     if (!info) info = await window.api.probe(tab.url);
