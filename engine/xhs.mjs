@@ -131,11 +131,14 @@ const CODEC_PREF = [['h264', 'H.264'], ['h265', 'H.265'], ['av1', 'AV1'], ['h266
 
 function extractVideos(note) {
   const out = [];
+  const seen = new Set();
+
   const push = (url, height, label, codec, bw, backups) => {
-    if (!url || out.some((x) => x.url === url)) return;
+    if (!url || seen.has(url)) return;
+    seen.add(url);
     out.push({
       qn: height || 720,
-      label: (label || '视频') + (height ? ` ${height}P` : ''),
+      label: (label || '视频') + (height ? ' ' + height + 'P' : ''),
       codec: codec || label || '',
       height: height || 0,
       vip: false,
@@ -145,25 +148,36 @@ function extractVideos(note) {
     });
   };
 
-  /* ① 标准结构：video.media.stream.{h264|h265|av1|h266}[] */
+  /* 新版小红书用 EF4/EF5/EF6… 当 stream 的 key，旧版是 h264/h265/av1。
+     统一按「有没有 masterUrl」收集，不再依赖具体 key 名。 */
   const stream = note?.video?.media?.stream;
-  if (stream) {
-    for (const [key, label] of CODEC_PREF) {
-      for (const item of stream[key] || []) {
-        push(item?.masterUrl, item?.height, label, label, item?.avgBitrate || item?.videoBitrate, item?.backupUrls);
+  if (stream && typeof stream === 'object') {
+    for (const [key, arr] of Object.entries(stream)) {
+      for (const item of arr || []) {
+        if (!item || !item.masterUrl) continue;
+        push(
+          item.masterUrl,
+          item.height,
+          item.streamDesc || item.videoCodec || key,
+          item.videoCodec || key,
+          item.avgBitrate || item.videoBitrate,
+          item.backupUrls,
+        );
       }
     }
   }
 
-  /* ② 兜底：originVideoKey 拼 CDN 地址（老结构常见） */
-  const key = note?.video?.consumer?.originVideoKey || note?.video?.consumer?.originVideoKeyV2;
-  if (key) push('https://sns-video-bd.xhscdn.com/' + String(key).replace(/^\/+/, ''), 0, '视频', 'AVC', 0, []);
+  /* 兜底一：originVideoKey 拼 CDN */
+  const originKey = note?.video?.consumer?.originVideoKey || note?.video?.consumer?.originVideoKeyV2;
+  if (originKey) {
+    push('https://sns-video-bd.xhscdn.com/' + String(originKey).replace(/^\/+/, ''), 0, '视频', 'AVC', 0, []);
+  }
 
-  /* ③ 兜底：少数笔记直接给 url / media.video.url */
+  /* 兜底二：直接给 url */
   const direct = note?.video?.url || note?.video?.media?.video?.url || note?.video?.media?.video?.masterUrl;
   if (direct) push(direct, 0, '视频', 'AVC', 0, []);
 
-  out.sort((a, b) => (b.height || 0) - (a.height || 0));
+  out.sort((a, b) => (b.height || 0) - (a.height || 0) || (b.bandwidth || 0) - (a.bandwidth || 0));
   return out;
 }
 
