@@ -425,7 +425,7 @@ function renderSide() {
           h('span', { className: 'q' }, (v.label || v.height + 'P') + (v.codec ? ' · ' + v.codec : '') + (v.vip ? ' · 会员' : '')),
           h('span', { className: 'sz' }, estSize(v)),
         );
-        row.onclick = () => { pick.videoIdx = idx; pick.videoUrl = v.url; renderSide(); };
+        row.onclick = () => { pick.videoIdx = idx; pick.videoUrl = v.url; pick.videoQn = v.qn; renderSide(); };
         menu.append(row);
       }
       card.append(menu);
@@ -533,6 +533,7 @@ async function parseTab(tab, auto) {
     tab.info = info;
     tab.err = '';
     tab.pick = {
+      videoQn: info.videos?.[0]?.qn ?? null,
       videoIdx: 0,
       videoUrl: info.videos?.[0]?.url || null,
       audio: false, audioId: null, audioMp3: true,
@@ -550,6 +551,8 @@ async function parseTab(tab, auto) {
 /* ── 下载 ── */
 async function startDownload(tab) {
   if (!tab.info) return;
+  const cur = (tab.info.videos || [])[tab.pick.videoIdx ?? 0];
+  if (cur && (tab.pick.videoQn === null || tab.pick.videoQn === undefined)) tab.pick.videoQn = cur.qn;
   const job = await window.api.start({ url: tab.url, info: tab.info, pick: tab.pick });
   S.jobs.unshift({ id: job.id, title: tab.info.title, cover: tab.info.cover, items: job.items || [], at: Date.now(), status: job.status || 'running', url: tab.url });
   tab.info = null; tab.pick = null;
