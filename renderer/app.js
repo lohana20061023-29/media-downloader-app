@@ -336,6 +336,17 @@ function setView(v, keepTab) {
 }
 
 /* ── 资源面板 ── */
+function imgWithFallback(url, extra) {
+  const el = h('img', { src: url, referrerPolicy: 'no-referrer', ...(extra || {}) });
+  el.onerror = async () => {
+    el.onerror = null;
+    const data = await window.api.imgProxy(url).catch(() => '');
+    if (data) el.src = data;
+    else el.style.visibility = 'hidden';
+  };
+  return el;
+}
+
 function renderSide() {
   const box = $('side');
   box.replaceChildren();
@@ -363,7 +374,8 @@ function renderSide() {
 
   /* 默认选最高画质（info.videos 已按画质从高到低排好） */
   const vlist = info.videos || [];
-  const cur = vlist.find((v) => v.qn === pick.videoQn) || vlist[0] || null;
+  if (pick.videoIdx === undefined && vlist.length) pick.videoIdx = 0;
+  const cur = vlist[pick.videoIdx] || vlist[0] || null;
 
   const estSize = (v) => {
     if (!v.bandwidth || !info.duration) return '';
@@ -378,7 +390,7 @@ function renderSide() {
     card.append(h('h4', {}, '视频', h('span', {}, cur ? '当前 ' + (cur.label || cur.height + 'P') : '')));
 
     const head = h('div', { className: 'mhead' },
-      info.cover ? h('img', { src: info.cover, referrerPolicy: 'no-referrer' }) : null,
+      info.cover ? imgWithFallback(info.cover) : null,
       h('div', { className: 'info' },
         h('div', { className: 'tt' }, info.title || '（无标题）'),
         h('div', { className: 'ss' },
@@ -394,7 +406,7 @@ function renderSide() {
     caret.append(icon('M6 9l6 6 6-6'));
     caret.onclick = () => {
       tab.menuOpen = !tab.menuOpen;
-      if (tab.menuOpen && !tab.pick.videoQn) tab.pick.videoQn = vlist[0].qn;
+      if (tab.menuOpen && tab.pick.videoIdx === undefined && vlist.length) tab.pick.videoIdx = 0;
       renderSide();
     };
     bar.append(dl, caret);
@@ -402,14 +414,15 @@ function renderSide() {
 
     if (tab.menuOpen) {
       const menu = h('div', { className: 'menu' });
-      for (const v of vlist) {
-        const on = pick.videoQn === v.qn;
+      for (let idx = 0; idx < vlist.length; idx += 1) {
+        const v = vlist[idx];
+        const on = (pick.videoIdx ?? 0) === idx;
         const row = h('div', { className: 'mrow' + (on ? ' on' : '') },
           h('span', { className: 'tick' }, on ? '✓' : ''),
           h('span', { className: 'q' }, (v.label || v.height + 'P') + (v.codec ? ' · ' + v.codec : '') + (v.vip ? ' · 会员' : '')),
           h('span', { className: 'sz' }, estSize(v)),
         );
-        row.onclick = () => { pick.videoQn = v.qn; tab.menuOpen = false; renderSide(); };
+        row.onclick = () => { pick.videoIdx = idx; pick.videoUrl = v.url; renderSide(); };
         menu.append(row);
       }
       card.append(menu);
@@ -431,7 +444,7 @@ function renderSide() {
     const picks = h('div', { className: 'picks' });
     const card = (url, on, cap, round, toggle) => {
       const el = h('div', { className: 'pick' + (round ? ' round' : '') + (on ? ' on' : ''), title: cap },
-        h('div', { className: 'frame' }, h('img', { src: url, referrerPolicy: 'no-referrer' })),
+        h('div', { className: 'frame' }, imgWithFallback(url)),
         h('span', { className: 'cap' }, cap));
       el.onclick = () => { toggle(); renderSide(); };
       return el;
@@ -451,7 +464,7 @@ function renderSide() {
     for (const img of info.images) {
       const on = (pick.imageIds || []).includes(img.id);
       const el = h('div', { className: 'pick' + (on ? ' on' : '') },
-        h('div', { className: 'frame' }, h('img', { src: img.url, referrerPolicy: 'no-referrer' })));
+        h('div', { className: 'frame' }, imgWithFallback(img.url)));
       el.onclick = () => {
         const cur = pick.imageIds || [];
         pick.imageIds = on ? cur.filter((x) => x !== img.id) : [...cur, img.id];
@@ -517,7 +530,8 @@ async function parseTab(tab, auto) {
     tab.info = info;
     tab.err = '';
     tab.pick = {
-      videoQn: info.videos?.[0]?.qn ?? null,
+      videoIdx: 0,
+      videoUrl: info.videos?.[0]?.url || null,
       audio: false, audioId: null, audioMp3: true,
       coverIds: [], avatar: false, imageIds: [],
     };

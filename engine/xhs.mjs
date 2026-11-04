@@ -418,9 +418,10 @@ export async function startXhsDownload(req, { info, onUpdate } = {}) {
         }
         notify();
       }
-
-      if (pick.videoQn !== null && pick.videoQn !== undefined && info.videos?.[0]) {
-        const v = info.videos[0];
+      /* 选中项按 url 精确定位（同分辨率可能有多条） */
+      const chosen = (pick.videoUrl && info.videos?.find((x) => x.url === pick.videoUrl)) || info.videos?.[pick.videoIdx ?? 0] || info.videos?.[0];
+      if (chosen) {
+        const v = chosen;
         const item = { kind: 'video', label: '视频', status: 'working', file: null, error: null, parts: [{ name: 'download', received: 0, total: 0 }] };
         job.items.push(item); notify();
         try {

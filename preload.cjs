@@ -6,6 +6,7 @@ contextBridge.exposeInMainWorld('api', {
   winMax: () => ipcRenderer.invoke('win-max'),
   winClose: () => ipcRenderer.invoke('win-close'),
   bootstrap: () => ipcRenderer.invoke('bootstrap'),
+  imgProxy: (url) => ipcRenderer.invoke('img-proxy', url),
   probe: (url) => ipcRenderer.invoke('probe', url),
   xhsFromPage: (payload) => ipcRenderer.invoke('xhs-from-page', payload),
   start: (payload) => ipcRenderer.invoke('start', payload),

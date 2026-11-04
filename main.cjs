@@ -229,6 +229,32 @@ ipcMain.handle('xhs-from-page', async (_e, payload) => {
   }
 });
 
+const imgCache = new Map();
+
+ipcMain.handle('img-proxy', async (_e, url) => {
+  if (!url || !/^https?:/i.test(url)) return '';
+  if (imgCache.has(url)) return imgCache.get(url);
+  try {
+    const host = new URL(url).hostname;
+    const res = await fetch(url, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36',
+        Referer: /xhscdn|xhscdn\.com|xiaohongshu/.test(host) ? 'https://www.xiaohongshu.com/' : new URL(url).origin + '/',
+        Accept: 'image/avif,image/webp,image/apng,image/*,*/*;q=0.8',
+      },
+      signal: AbortSignal.timeout(15000),
+    });
+    if (!res.ok) return '';
+    const buf = Buffer.from(await res.arrayBuffer());
+    if (buf.length > 8 * 1024 * 1024) return '';
+    const ct = res.headers.get('content-type') || 'image/jpeg';
+    const data = 'data:' + ct + ';base64,' + buf.toString('base64');
+    if (imgCache.size > 120) imgCache.clear();
+    imgCache.set(url, data);
+    return data;
+  } catch { return ''; }
+});
+
 ipcMain.handle('bootstrap', async () => {
   const e = await loadEngine();
   const me = await e.bili.loginStatus().catch(() => ({ login: false, uname: '', face: '' }));
