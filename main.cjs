@@ -89,7 +89,7 @@ let tray = null;
 function createMain() {
   mainWin = new BrowserWindow({
     width: 1180, height: 820, minWidth: 1000, minHeight: 680,
-    title: 'LoDown', backgroundColor: '#f2f4f7', show: false, frame: false,
+    title: 'LOHANA DX', backgroundColor: '#f2f4f7', show: false, frame: false,
     autoHideMenuBar: true,
     webPreferences: { preload: join(__dirname, 'preload.cjs'), contextIsolation: true, nodeIntegration: false, webviewTag: true },
   });
@@ -520,7 +520,7 @@ function createTray() {
   try {
     const icon = nativeImage.createFromPath(join(__dirname, 'renderer', 'icon.png'));
     tray = new Tray(icon.isEmpty() ? nativeImage.createEmpty() : icon);
-    tray.setToolTip('LoDown');
+    tray.setToolTip('LOHANA DX');
     tray.setContextMenu(Menu.buildFromTemplate([
       { label: '打开窗口', click: showMain },
       { type: 'separator' },
@@ -529,6 +529,13 @@ function createTray() {
     tray.on('click', showMain);
   } catch (e) { console.error('托盘创建失败', e); }
 }
+
+/* 改名后仍沿用旧的数据目录，历史记录与设置不丢 */
+try {
+  const path = require('node:path');
+  app.setName('LOHANA DX');
+  app.setPath('userData', path.join(app.getPath('appData'), 'LoDown'));
+} catch {}
 
 app.whenReady().then(async () => {
   loadState();
