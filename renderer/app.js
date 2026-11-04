@@ -336,12 +336,15 @@ function setView(v, keepTab) {
 }
 
 /* ── 资源面板 ── */
-function imgWithFallback(url, extra) {
+function imgWithFallback(url, alt, extra) {
   const el = h('img', { src: url, referrerPolicy: 'no-referrer', ...(extra || {}) });
+  let stage = 0;
   el.onerror = async () => {
-    el.onerror = null;
-    const data = await window.api.imgProxy(url).catch(() => '');
-    if (data) el.src = data;
+    stage += 1;
+    if (stage === 1 && alt && alt !== url) { el.src = alt; return; }
+    const source = alt || url;
+    const data = await window.api.imgProxy(source).catch(() => '');
+    if (data) { el.src = data; el.onerror = null; }
     else el.style.visibility = 'hidden';
   };
   return el;
@@ -387,7 +390,7 @@ function renderSide() {
     /* 卡片：封面 + 标题 + 当前画质 + 下载按钮 + 下拉列表 */
     const card = h('div', { className: 'mcard' });
 
-    card.append(h('h4', {}, '视频', h('span', {}, cur ? '当前 ' + (cur.label || cur.height + 'P') : '')));
+    card.append(h('h4', {}, '视频', h('span', {}, cur && cur.height ? '当前 ' + cur.height + 'P' : '')));
 
     const head = h('div', { className: 'mhead' },
       info.cover ? imgWithFallback(info.cover) : null,
@@ -400,7 +403,7 @@ function renderSide() {
     card.append(head);
 
     const bar = h('div', { className: 'dlbar' });
-    const dl = h('button', { className: 'main' }, icon('M12 4v10m0 0l-4-4m4 4l4-4M5 18h14'), cur ? '下载 ' + (cur.label || cur.height + 'P') : '下载');
+    const dl = h('button', { className: 'main' }, icon('M12 4v10m0 0l-4-4m4 4l4-4M5 18h14'), cur && cur.height ? '下载 ' + cur.height + 'P' : '下载');
     dl.onclick = () => startDownload(tab);
     const caret = h('button', { className: 'caret' + (tab.menuOpen ? ' open' : ''), title: '选择分辨率' });
     caret.append(icon('M6 9l6 6 6-6'));
@@ -464,7 +467,7 @@ function renderSide() {
     for (const img of info.images) {
       const on = (pick.imageIds || []).includes(img.id);
       const el = h('div', { className: 'pick' + (on ? ' on' : '') },
-        h('div', { className: 'frame' }, imgWithFallback(img.url)));
+        h('div', { className: 'frame' }, imgWithFallback(img.url, img.alt)));
       el.onclick = () => {
         const cur = pick.imageIds || [];
         pick.imageIds = on ? cur.filter((x) => x !== img.id) : [...cur, img.id];

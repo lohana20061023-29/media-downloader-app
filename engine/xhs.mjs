@@ -197,6 +197,8 @@ function cleanImageUrl(img) {
 
 function normalize(note, id, wholeState) {
   const videos = extractVideos(note);
+  /* 原始图片地址（去水印模板失效时兜底用） */
+  const rawImages = (note.imageList || []).map((img) => img?.urlDefault || img?.url || (img?.infoList || [])[0]?.url || '').filter(Boolean);
   /* 时长：capa.duration 是秒；stream[].duration 是毫秒 */
   const rawDur = note?.video?.capa?.duration
     ?? note?.video?.media?.stream?.h264?.[0]?.duration
@@ -220,6 +222,7 @@ function normalize(note, id, wholeState) {
       id: `img${i + 1}`,
       label: images.length > 1 ? `图 ${i + 1}` : '图片',
       url,
+      alt: rawImages[i] || url,
     })),
     /* 图文作品的图片已经在 images 里；封面只给视频笔记用，避免重复 */
     covers: videos.length
