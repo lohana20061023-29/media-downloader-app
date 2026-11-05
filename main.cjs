@@ -338,6 +338,14 @@ function componentsDir() {
   return require('node:path').join(app.getPath('userData'), 'components');
 }
 
+ipcMain.handle('app-quit', () => {
+  app.isQuitting = true;
+  try { if (tray) { tray.destroy(); tray = null; } } catch {}
+  app.quit();
+  setTimeout(() => app.exit(0), 800);
+  return true;
+});
+
 ipcMain.handle('legal-status', () => ({
   version: LEGAL_VERSION,
   accepted: state.legalVersion === LEGAL_VERSION,

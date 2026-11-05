@@ -76,7 +76,7 @@ async function legalGate() {
         modal.hidden = true;
         resolve();
       };
-      $('legalQuit').onclick = () => { window.api.winClose(); };
+      $('legalQuit').onclick = () => { window.api.quitApp(); };
     });
   }
 

@@ -7,6 +7,7 @@ contextBridge.exposeInMainWorld('api', {
   winClose: () => ipcRenderer.invoke('win-close'),
   bootstrapLogin: () => ipcRenderer.invoke('bootstrap-login'),
   syncCookies: () => ipcRenderer.invoke('sync-cookies'),
+  quitApp: () => ipcRenderer.invoke('app-quit'),
   legalStatus: () => ipcRenderer.invoke('legal-status'),
   legalAccept: (kind) => ipcRenderer.invoke('legal-accept', kind),
   componentsInstall: () => ipcRenderer.invoke('components-install'),
