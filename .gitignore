@@ -5,3 +5,6 @@ ui-*.png
 exe-icon-check.png
 vendor/*.exe
 vendor/*.zip
+
+vendor/python/
+vendor/python-embed.zip
