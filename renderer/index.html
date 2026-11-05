@@ -63,13 +63,18 @@
   .startpage{position:absolute;inset:0;background:var(--bg);display:flex;align-items:center;justify-content:center}
   .startpage .inner{text-align:center}
   .startpage h1{font-size:30px;margin:0 0 8px;letter-spacing:.5px}
+  .startpage .brandwrap{display:inline-block;text-align:center}
+  .startpage .brand{display:block;height:70px;width:auto;margin:0 auto}
+  .startpage .brandbar{height:9px;border-radius:5px;width:99%;margin:4px auto 12px;
+    background:linear-gradient(90deg,#5aa6ff 0%,#1b7bff 45%,#0d5cf0 100%);
+    transform:skewX(-18deg);box-shadow:0 2px 8px rgba(27,123,255,.22)}
   .startpage p{color:var(--sub);font-size:13px;margin:0}
 
   .side{width:308px;flex:0 0 308px;border-left:1px solid var(--line);overflow:auto;padding:12px;background:#fff;display:flex;flex-direction:column}
   .side[hidden]{display:none}
 
   .pwrap{max-width:1020px;margin:0 auto}
-  .page{flex:1;min-height:0;overflow:auto;padding:14px 16px;background:var(--bg)}
+  .page{flex:1;min-height:0;overflow:auto;scrollbar-gutter:stable;padding:14px 16px;background:var(--bg)}
   .page > .hdate, .page > .hcard, .page > .segs{max-width:1020px;margin-left:auto;margin-right:auto}
   .page[hidden]{display:none}
 
@@ -214,6 +219,46 @@
   .winbtns{margin-left:auto;display:flex;align-items:center;gap:2px;margin-right:4px;-webkit-app-region:no-drag}
   .winbtns.inTabs{margin-top:-5px}
   .winbtns.inBar{margin-top:1px}
+  /* 下载列表（表格） */
+  .dlhead,.dlrow{display:grid;grid-template-columns:46px minmax(150px,2.2fr) 132px 78px 84px 108px 66px minmax(110px,1.4fr) 104px;
+    align-items:center;column-gap:10px}
+  .dlhead{padding:8px 12px;color:var(--sub);font-size:12px;border-bottom:1px solid var(--line)}
+  .dlrow{padding:9px 12px;background:#fff;border:1px solid #cfd9e8;border-radius:12px;margin-bottom:8px;font-size:13px}
+  .dlrow .thumb{width:38px;height:38px;border-radius:8px;overflow:hidden;background:#eef2f8;display:flex;align-items:center;justify-content:center}
+  .dlrow .thumb img{width:100%;height:100%;object-fit:cover}
+  .dlrow .name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600}
+  .dlrow .prog{display:flex;align-items:center;gap:8px}
+  .dlrow .track{flex:1;height:5px;border-radius:999px;background:#e6edf7;overflow:hidden}
+  .dlrow .track i{display:block;height:100%;border-radius:999px;background:linear-gradient(90deg,#5aa6ff,#1b7bff)}
+  .dlrow .pct{font-size:11.5px;color:var(--sub);width:34px;text-align:right}
+  .dlrow .num{font-size:12.5px;color:var(--sub)}
+  .dlrow .time{font-size:12px;color:var(--sub)}
+  .dlrow .st{font-size:12.5px;font-weight:600}
+  .dlrow .st.ok{color:#12a150}
+  .dlrow .st.bad{color:#d93838}
+  .dlrow .st.run{color:#1b7bff}
+  .dlrow .path{font-size:12px;color:var(--sub);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .dlrow .acts{display:flex;gap:6px;justify-content:flex-end}
+  .dlrow .ibtn{width:30px;height:30px;border:1px solid #dbe3ee;border-radius:9px;background:#f7f9fc;color:#54657d;
+    display:flex;align-items:center;justify-content:center;cursor:pointer}
+  .dlrow .ibtn svg{flex:0 0 16px;width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
+  .dlrow .ibtn:hover{border-color:var(--accent);color:var(--accent)}
+  .dlrow .ibtn.danger:hover{border-color:#e0b4b4;background:#fff5f5;color:#d93838}
+  /* 首次使用须知 */
+  .legal{position:fixed;inset:0;background:rgba(18,26,38,.55);backdrop-filter:blur(3px);z-index:9999;display:flex;align-items:center;justify-content:center}
+  .legalBox{width:min(680px,92vw);max-height:86vh;background:#fff;border-radius:16px;padding:22px 24px;display:flex;flex-direction:column;gap:12px;box-shadow:0 20px 60px rgba(16,24,40,.28)}
+  .legalBox h2{margin:0;font-size:17px;display:flex;align-items:center;gap:10px}
+  .legalBox h2 .ver{font-size:11px;font-weight:500;color:#8a97a8;background:#f1f4f9;border-radius:6px;padding:2px 6px}
+  .legalText{overflow:auto;font-size:13px;line-height:1.75;color:#3c4a5c;padding-right:6px}
+  .legalText h3{margin:14px 0 6px;font-size:13.5px;color:#16202c}
+  .legalText p{margin:0 0 8px}
+  .legalText ul{margin:2px 0 8px;padding-left:20px}
+  .legalChk{display:flex;gap:8px;align-items:flex-start;font-size:12.5px;color:#39485a;background:#f7f9fc;border:1px solid #e3eaf4;border-radius:10px;padding:10px 12px}
+  .legalFoot{display:flex;align-items:center;justify-content:flex-end;gap:10px}
+  .legalFoot .compStatus{margin-right:auto;font-size:12px;color:#5c6b7d}
+  .legalFoot .primary{padding:9px 18px;border-radius:9px;border:none;background:var(--accent,#1b7bff);color:#fff;font-size:13px;cursor:pointer}
+  .legalFoot .primary:disabled{opacity:.45;cursor:not-allowed}
+  .legalFoot .ghost{padding:9px 14px;border-radius:9px;border:1px solid #dbe3ee;background:#fff;color:#4a5a6d;font-size:13px;cursor:pointer}
 </style>
 
 <div class="app">
@@ -274,7 +319,10 @@
         <div class="views" id="views"></div>
         <div class="startpage" id="startpage">
           <div class="inner">
-            <h1>LoDown</h1>
+            <div class="brandwrap">
+              <img class="brand" src="assets/lohana-dx-wordmark.png" alt="LOHANA DX" />
+              <div class="brandbar"></div>
+            </div>
             <p>上方输入网址开始浏览；支持的站点右上角会出现「下载此页」</p>
           </div>
         </div>
@@ -298,5 +346,61 @@
     </div>
   </div>
 </div>
-<script src="app.js"></script>
+
+  <!-- 首次使用须知 -->
+  <div class="legal" id="legalModal" hidden>
+    <div class="legalBox">
+      <h2>LOHANA DX 使用须知与免责声明<span class="ver">v1.0.0</span></h2>
+      <div class="legalText" id="legalText">
+        <h3>一、用途与授权</h3>
+        <p>LOHANA DX 是一款本地运行的媒体下载工具，仅用于下载<strong>你有权访问</strong>的公开内容，供个人备份、离线观看与学习研究使用。请勿用于商业用途、二次分发、批量采集或任何侵犯他人权益的行为。</p>
+        <h3>二、支持平台</h3>
+        <p>当前支持：哔哩哔哩、抖音、小红书、YouTube、X（Twitter）、TikTok、Vimeo。各平台的可用性取决于其自身接口与账号状态，我们不保证任何平台长期可用。</p>
+        <h3>三、版权与责任</h3>
+        <p>所有下载内容（视频、音频、封面、头像、图文）的著作权归原作者及平台所有。你需要自行确认下载行为符合平台服务条款与当地法律。因使用本软件产生的任何版权纠纷、账号风险或数据损失，由使用者自行承担，软件作者不承担任何责任。</p>
+        <h3>四、账号与 Cookie</h3>
+        <p>登录状态（Cookie）仅保存在你自己的电脑上，用于向对应平台发起请求，不会上传到我们的服务器（本软件没有服务器）。你可以随时在「设置 → 账号」中退出登录并清除。</p>
+        <h3>五、第三方组件</h3>
+        <p>为解析部分平台并合并音视频，本软件会使用以下开源组件。它们<strong>不随安装包分发</strong>，需要你在本弹窗中另行确认后才会下载到本地：</p>
+        <ul>
+          <li><strong>FFmpeg</strong>（LGPL/GPL）——音视频合流与格式转换</li>
+          <li><strong>TikTokDownloader 签名实现</strong>（Apache-2.0）——抖音接口签名，内置精简 Python 运行时</li>
+          <li><strong>yt-dlp</strong>（Unlicense）——部分站点的通用解析</li>
+        </ul>
+        <p>上述组件按「原样」提供，其许可证与免责条款同样适用于它们。不下装这些组件时，抖音等平台可能只能获取较低画质，其余功能不受影响。</p>
+        <h3>六、软件本身</h3>
+        <p>本软件按「现状」提供，不附带任何明示或暗示的担保。作者保留随时修改、暂停或终止更新的权利。若你不同意上述条款，请立即关闭并卸载本软件。</p>
+      </div>
+      <label class="legalChk"><input type="checkbox" id="legalAgree" /> 我已阅读并同意以上全部内容，并承诺仅将本软件用于合法用途</label>
+      <div class="legalFoot">
+        <button class="ghost" id="legalQuit">不同意并退出</button>
+        <button class="primary" id="legalOk" disabled>同意并继续</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 第三方组件确认 -->
+  <div class="legal" id="compModal" hidden>
+    <div class="legalBox">
+      <h2>下载第三方解析组件</h2>
+      <div class="legalText">
+        <p>抖音高清画质与实况图动态流需要以下开源组件，它们不包含在安装包内，点击「下载」后才会从 GitHub Releases 下载到本机：</p>
+        <ul>
+          <li><strong>TikTokDownloader</strong> 的 a_bogus / WebSign 签名实现 · Apache-2.0</li>
+          <li><strong>Python 3.11</strong> 精简运行时（约 15 MB）· PSF License</li>
+          <li><strong>FFmpeg</strong>（已内置，无需重复下载）· LGPL/GPL</li>
+          <li><strong>yt-dlp</strong>（可选，用于通用站点）· Unlicense</li>
+        </ul>
+        <p>这些组件按「原样」提供，其作者不对使用后果负责。你可以随时在设置中删除它们。</p>
+      </div>
+      <label class="legalChk"><input type="checkbox" id="compAgree" /> 我已知晓并同意下载上述开源组件</label>
+      <div class="legalFoot">
+        <span class="compStatus" id="compStatus"></span>
+        <button class="ghost" id="compCancel">以后再说</button>
+        <button class="primary" id="compOk" disabled>下载并启用</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
 </html>

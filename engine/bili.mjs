@@ -646,6 +646,7 @@ export async function startDownload(req, { info: known, onUpdate } = {}) {
           const img = await fetchBytes(c.url);
           const file = join(req.outDir, `${base}${tag}_封面_${safeName(c.label, 12)}${imageExtFrom(img.body)}`);
           await writeFile(file, img.body);
+          item.parts = [{ name: 'image', received: img.body.length, total: img.body.length }];
           item.file = file; item.status = 'done';
         } catch (err) {
           item.status = 'error'; item.error = err.message;
@@ -660,6 +661,7 @@ export async function startDownload(req, { info: known, onUpdate } = {}) {
         const img = await fetchBytes(info.up.face);
         const file = join(req.outDir, `${safeName(info.up.name, 40)}_头像${imageExtFrom(img.body)}`);
         await writeFile(file, img.body);
+        item.parts = [{ name: 'image', received: img.body.length, total: img.body.length }];
         item.file = file; item.status = 'done'; notify();
       }
 

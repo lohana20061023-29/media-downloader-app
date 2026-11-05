@@ -1,4 +1,14 @@
-﻿const { app, BrowserWindow, ipcMain, dialog, clipboard, screen, shell, session, Tray, Menu, nativeImage } = require('electron');
+﻿function bootMark(label) {
+  try {
+    const fs = require('node:fs');
+    const os = require('node:os');
+    const path = require('node:path');
+    fs.appendFileSync(path.join(os.tmpdir(), 'lodown-boot.log'),
+      Date.now() + ' ' + (process.uptime() * 1000).toFixed(0) + 'ms ' + label + '\n');
+  } catch {}
+}
+
+const { app, BrowserWindow, ipcMain, dialog, clipboard, screen, shell, session, Tray, Menu, nativeImage } = require('electron');
 const { readFileSync, writeFileSync, existsSync, mkdirSync, rmSync } = require('node:fs');
 const { join, dirname } = require('node:path');
 
@@ -50,7 +60,7 @@ function bundledFfmpeg() {
    写进 ~/.dsh/bili-dl/cookies.txt（插件用的同一个文件），
    yt-dlp 走 --cookies，抖音走 MEDIADL_COOKIE_FILE。 */
 /* 只保留真正需要登录的平台：抖音/小红书解析靠匿名或浏览器，Vimeo 用不上 */
-const LOGIN_ALLOW = ['youtube', 'bilibili', 'twitter', 'tiktok', 'xiaohongshu'];
+const LOGIN_ALLOW = ['youtube', 'bilibili', 'twitter', 'tiktok', 'xiaohongshu', 'douyin'];
 
 function wireCookieConsumers(e) {
   try {
@@ -61,7 +71,7 @@ function wireCookieConsumers(e) {
 
 /* ── 设置 ─────────────────────────────────────────────── */
 const stateFile = () => join(app.getPath('userData'), 'state.json');
-const DEFAULT_OUT = () => join(app.getPath('downloads'), 'LoDown');
+const DEFAULT_OUT = () => join(app.getPath('downloads'), 'LOHANA DX');
 
 let state = { outDir: '', copyToast: true, proxy: '', ffmpeg: '' };
 function loadState() {
@@ -89,12 +99,14 @@ let tray = null;
 function createMain() {
   mainWin = new BrowserWindow({
     width: 1180, height: 820, minWidth: 1000, minHeight: 680,
-    title: 'LOHANA DX', backgroundColor: '#f2f4f7', show: false, frame: false,
+    title: 'LOHANA DX', backgroundColor: '#f2f4f7', show: true, frame: false,
+    icon: join(__dirname, 'renderer', 'icon.ico'),
     autoHideMenuBar: true,
     webPreferences: { preload: join(__dirname, 'preload.cjs'), contextIsolation: true, nodeIntegration: false, webviewTag: true },
   });
   mainWin.loadFile(join(__dirname, 'renderer', 'index.html'));
-  mainWin.once('ready-to-show', () => mainWin.show());
+  mainWin.webContents.on('did-finish-load', () => bootMark('renderer-loaded'));
+  bootMark('window-created');
   mainWin.on('close', (e) => {
     if (!app.isQuitting) { e.preventDefault(); mainWin.hide(); }
   });
@@ -255,18 +267,225 @@ ipcMain.handle('img-proxy', async (_e, url) => {
   } catch { return ''; }
 });
 
-ipcMain.handle('bootstrap', async () => {
-  const e = await loadEngine();
-  const me = await e.bili.loginStatus().catch(() => ({ login: false, uname: '', face: '' }));
+/* 把浏览/登录窗口里的 Cookie 同步进共享 cookies.txt，
+   让「浏览用的登录态」和「解析/下载用的登录态」是同一套 */
+const COOKIE_HOSTS = ['bilibili.com', 'douyin.com', 'xiaohongshu.com', 'youtube.com', 'twitter.com', 'x.com', 'tiktok.com'];
+
+async function syncCookiesToJar() {
+  try {
+    const fs = require('node:fs');
+    const path = require('node:path');
+    const { session } = require('electron');
+    const jarPath = path.join(require('node:os').homedir(), '.dsh', 'bili-dl', 'cookies.txt');
+
+    const sessions = [session.defaultSession];
+    for (const key of LOGIN_ALLOW) {
+      try { sessions.push(session.fromPartition('persist:login-' + key)); } catch {}
+    }
+
+    const collected = [];
+    for (const sess of sessions) {
+      let list = [];
+      try { list = await sess.cookies.get({}); } catch { continue; }
+      for (const c of list) {
+        const host = String(c.domain || '').replace(/^\./, '');
+        if (!COOKIE_HOSTS.some((h) => host === h || host.endsWith('.' + h))) continue;
+        collected.push(c);
+      }
+    }
+    if (!collected.length) return 0;
+
+    let lines = [];
+    try { lines = fs.readFileSync(jarPath, 'utf8').split(/\r?\n/); } catch { lines = []; }
+
+    const keyOf = (domain, name, p2) => domain + '|' + name + '|' + (p2 || '/');
+    const existing = new Map();
+    const kept = [];
+    for (const line of lines) {
+      if (!line || line.startsWith('#')) { kept.push(line); continue; }
+      const cols = line.split('\t');
+      if (cols.length < 7) { kept.push(line); continue; }
+      existing.set(keyOf(cols[0], cols[5], cols[2]), true);
+      kept.push(line);
+    }
+
+    let added = 0;
+    for (const c of collected) {
+      const domain = c.domain && c.domain.startsWith('.') ? c.domain : '.' + (c.domain || '');
+      const key = keyOf(domain, c.name, c.path);
+      if (existing.has(key)) continue;
+      existing.set(key, true);
+      const expiry = Math.round(c.expirationDate || (Date.now() / 1000 + 86400));
+      kept.push([domain, c.httpOnly ? 'TRUE' : 'FALSE', c.path || '/', c.secure ? 'TRUE' : 'FALSE', String(expiry), c.name, c.value].join('\t'));
+      added += 1;
+    }
+
+    if (added) {
+      fs.mkdirSync(path.dirname(jarPath), { recursive: true });
+      fs.writeFileSync(jarPath, kept.join('\n') + '\n', 'utf8');
+    }
+    return added;
+  } catch { return 0; }
+}
+
+ipcMain.handle('sync-cookies', async () => syncCookiesToJar());
+
+/* ── 首次使用须知 / 第三方组件 ── */
+const LEGAL_VERSION = '1.0.0';
+const COMPONENT_VERSION = '1';
+
+function componentsDir() {
+  return require('node:path').join(app.getPath('userData'), 'components');
+}
+
+ipcMain.handle('legal-status', () => ({
+  version: LEGAL_VERSION,
+  accepted: state.legalVersion === LEGAL_VERSION,
+  acceptedAt: state.legalAt || 0,
+  components: {
+    version: COMPONENT_VERSION,
+    accepted: state.componentsVersion === COMPONENT_VERSION,
+    installed: existsSync(require('node:path').join(componentsDir(), 'python', 'python.exe')),
+    dir: componentsDir(),
+  },
+  platforms: ['bilibili', 'douyin', 'xiaohongshu', 'youtube', 'twitter', 'tiktok', 'vimeo'],
+}));
+
+ipcMain.handle('legal-accept', (_e, kind) => {
+  if (kind === 'components') {
+    state.componentsVersion = COMPONENT_VERSION;
+    state.componentsAt = Date.now();
+  } else {
+    state.legalVersion = LEGAL_VERSION;
+    state.legalAt = Date.now();
+  }
+  saveState(state);
+  return true;
+});
+
+/* 下载第三方组件包（抖音签名器：内置 Python + TikTokDownloader 签名实现） */
+ipcMain.handle('components-install', async (event) => {
+  const fs = require('node:fs');
+  const path = require('node:path');
+  const os = require('node:os');
+  const { execFile } = require('node:child_process');
+
+  const dir = componentsDir();
+  await fs.promises.mkdir(dir, { recursive: true });
+  const zipPath = path.join(os.tmpdir(), 'lodown-components-' + COMPONENT_VERSION + '.zip');
+  const url = 'https://github.com/lohana20061023-29/media-downloader-app/releases/download/components-v' + COMPONENT_VERSION + '/lodown-components-' + COMPONENT_VERSION + '.zip';
+
+  const send = (stage, pct) => { try { event.sender.send('components-progress', { stage, pct }); } catch {} };
+
+  send('下载组件包…', 5);
+  const res = await fetch(url, { redirect: 'follow' });
+  if (!res.ok) throw new Error('组件包下载失败 HTTP ' + res.status);
+  const buf = Buffer.from(await res.arrayBuffer());
+  await fs.promises.writeFile(zipPath, buf);
+  send('解压组件包…', 60);
+
+  await new Promise((resolve, reject) => {
+    execFile('tar', ['-xf', zipPath, '-C', dir], { windowsHide: true }, (err) => (err ? reject(err) : resolve()));
+  });
+  send('完成', 100);
+  return { ok: true, dir };
+});
+
+ipcMain.handle('bootstrap', () => {
+  /* 不加载引擎、不发网络请求：只回本地状态，保证首屏秒开 */
+  const bundled = bundledFfmpeg();
+  let ffmpeg = null;
+  try {
+    if (bundled && require('node:fs').existsSync(bundled)) ffmpeg = bundled;
+    else if (state.ffmpeg && require('node:fs').existsSync(state.ffmpeg)) ffmpeg = state.ffmpeg;
+  } catch {}
   return {
     outDir: state.outDir,
     copyToast: state.copyToast,
     proxy: state.proxy,
     version: app.getVersion(),
-    ffmpeg: await e.bili.findFfmpeg(bundledFfmpeg() || state.ffmpeg).catch(() => null),
-    login: me,
-    loginSites: await (async () => { try { return await e.browserLogin.detectLogins(); } catch { return {}; } })(),
+    ffmpeg,
   };
+});
+
+/* 登录态单独查，前端拿到后再刷新，不阻塞首屏 */
+ipcMain.handle('bootstrap-login', async () => {
+  const e = await loadEngine();
+  const me = await Promise.race([
+    e.bili.loginStatus().catch(() => ({ login: false, uname: '', face: '' })),
+    new Promise((r) => setTimeout(() => r({ login: false, uname: '', face: '' }), 1500)),
+  ]);
+  let sites = {};
+  try { sites = await e.browserLogin.detectLogins(); } catch {}
+  return { login: me, loginSites: sites };
+});
+
+/* 抖音：开一个隐藏窗口加载笔记页，用调试协议截获页面自己发出的
+   aweme/detail 响应（带真实登录态与签名），拿到 1080P 画质与实况图动态流 */
+ipcMain.handle('douyin-capture', async (_e, target) => {
+  const { BrowserWindow, session } = require('electron');
+  const id = (/(?:note|video)\/(\d{15,25})/.exec(String(target)) || [])[1] || '';
+  if (!id) return { ok: false, error: '无法解析作品 ID' };
+
+  const urls = [
+    'https://www.douyin.com/note/' + id,
+    'https://www.douyin.com/video/' + id,
+  ];
+
+  const capture = (url) => new Promise((resolve) => {
+    let win;
+    let settled = false;
+    const finish = (payload) => {
+      if (settled) return;
+      settled = true;
+      try { win.webContents.debugger.detach(); } catch {}
+      try { win.destroy(); } catch {}
+      resolve(payload);
+    };
+
+    win = new BrowserWindow({
+      show: true, x: -32000, y: -32000, skipTaskbar: true, width: 1280, height: 900,
+      webPreferences: { session: session.defaultSession, offscreen: false, backgroundThrottling: false },
+    });
+    win.webContents.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36');
+
+    const dbg = win.webContents.debugger;
+    try { dbg.attach('1.3'); } catch { finish(null); return; }
+    (async () => {
+      try {
+        await dbg.sendCommand('Network.enable');
+      } catch {}
+      dbg.on('message', async (_event, method, params) => {
+        if (method !== 'Network.responseReceived') return;
+        const u = params?.response?.url || '';
+        if (!/aweme\/detail|aweme\/v1\/web\/aweme/.test(u)) return;
+        try {
+          const body = await dbg.sendCommand('Network.getResponseBody', { requestId: params.requestId });
+          const text = body.base64Encoded ? Buffer.from(body.body, 'base64').toString('utf8') : body.body;
+          finish(JSON.parse(text));
+        } catch { finish(null); }
+      });
+    })();
+
+    win.loadURL(url).catch(() => finish(null));
+    setTimeout(() => finish(null), 22000);
+  });
+
+  for (const url of urls) {
+    const json = await capture(url);
+    const a = json && (json.aweme_detail || (json.aweme_details || [])[0]);
+    if (a) {
+      try {
+        const e = await loadEngine();
+        const info = e.douyin.normalizeAwemeItem(a, id);
+        e.bili.registerImage(info.cover);
+        (info.images || []).forEach((x) => e.bili.registerImage(x.url));
+        e.bili.registerImage(info.up?.face);
+        return { ok: true, info };
+      } catch (err) { return { ok: false, error: err.message }; }
+    }
+  }
+  return { ok: false, error: '没截到详情数据' };
 });
 
 ipcMain.handle('probe', (_e, url) => probeUniversal(url));
@@ -507,6 +726,26 @@ ipcMain.handle('history-remove', (_e, key) => {
 });
 
 ipcMain.handle('config', (_e, patch) => saveState(patch));
+ipcMain.handle('read-image', async (_e, file) => {
+  try {
+    const fs = require('node:fs');
+    const path = require('node:path');
+    const buf = await fs.promises.readFile(file);
+    if (!buf.length || buf.length > 12 * 1024 * 1024) return '';
+    const ext = path.extname(file).toLowerCase();
+    const mime = ext === '.png' ? 'image/png' : ext === '.webp' ? 'image/webp' : ext === '.gif' ? 'image/gif' : 'image/jpeg';
+    return 'data:' + mime + ';base64,' + buf.toString('base64');
+  } catch { return ''; }
+});
+
+ipcMain.handle('open-file', async (_e, file) => {
+  try { const { shell } = require('electron'); const err = await shell.openPath(file); return !err; } catch { return false; }
+});
+
+ipcMain.handle('delete-file', async (_e, file) => {
+  try { await require('node:fs').promises.unlink(file); return true; } catch { return false; }
+});
+
 ipcMain.handle('reveal', (_e, p) => { if (p) shell.showItemInFolder(p); });
 
 ipcMain.handle('toast-open', (_e, url) => {
@@ -518,7 +757,9 @@ ipcMain.handle('toast-open', (_e, url) => {
 /* ── 托盘 / 生命周期 ──────────────────────────────────── */
 function createTray() {
   try {
-    const icon = nativeImage.createFromPath(join(__dirname, 'renderer', 'icon.png'));
+    let icon = nativeImage.createFromPath(join(__dirname, 'renderer', 'icon.ico'));
+  if (icon.isEmpty()) icon = nativeImage.createFromPath(join(__dirname, 'renderer', 'icon.png'));
+  icon = icon.resize({ width: 16, height: 16 });
     tray = new Tray(icon.isEmpty() ? nativeImage.createEmpty() : icon);
     tray.setToolTip('LOHANA DX');
     tray.setContextMenu(Menu.buildFromTemplate([
@@ -537,7 +778,24 @@ try {
   app.setPath('userData', path.join(app.getPath('appData'), 'LoDown'));
 } catch {}
 
+/* 单实例：已经开着时再双击图标，只把现有窗口唤到前面 */
+const gotLock = app.requestSingleInstanceLock();
+if (!gotLock) {
+  app.quit();
+} else {
+  app.on('second-instance', () => {
+    if (!mainWin) return;
+    try {
+      if (mainWin.isMinimized()) mainWin.restore();
+      if (!mainWin.isVisible()) mainWin.show();
+      mainWin.focus();
+    } catch {}
+  });
+}
+
 app.whenReady().then(async () => {
+  try { process.env.LODOWN_COMPONENTS = require('node:path').join(app.getPath('userData'), 'components'); } catch {}
+  bootMark('app-ready');
   loadState();
   createMain();
   createTray();
@@ -553,9 +811,54 @@ app.whenReady().then(async () => {
 
 /* 网页里点开的链接（target=_blank / window.open）：拦下来交给渲染进程开新标签页，
    不生成独立窗口。Electron 33 已经移除 webview 的 new-window 事件，只能在这里拦。 */
+/* 抖音详情缓存：浏览时页面自己发出的 aweme/detail 响应（带签名与登录态）会被截下来，
+   解析时优先用它，从而拿到 1080P 与实况图动态流 */
+const awemeCache = new Map();
+
+ipcMain.handle('douyin-cached', async (_e, target) => {
+  const id = (/(?:note|video)\/(\d{15,25})/.exec(String(target)) || [])[1];
+  if (!id || !awemeCache.has(id)) return { ok: false };
+  try {
+    const e = await loadEngine();
+    const info = e.douyin.normalizeAwemeItem(awemeCache.get(id), id);
+    e.bili.registerImage(info.cover);
+    (info.images || []).forEach((x) => e.bili.registerImage(x.url));
+    return { ok: true, info };
+  } catch (err) { return { ok: false, error: err.message }; }
+});
+
 app.on('web-contents-created', (_event, contents) => {
   try {
     if (contents.getType() !== 'webview') return;
+
+    /* 调试协议：抓页面自己发出的抖音详情请求 */
+    try {
+      const dbg = contents.debugger;
+      dbg.attach('1.3');
+      dbg.sendCommand('Network.enable').catch(() => {});
+      dbg.on('message', async (_e2, method, params) => {
+        if (method !== 'Network.responseReceived') return;
+        const u = params?.response?.url || '';
+        const m2 = /aweme\/v1\/web\/aweme\/detail/.test(u);
+        if (!m2) return;
+        try {
+          const body = await dbg.sendCommand('Network.getResponseBody', { requestId: params.requestId });
+          const text = body.base64Encoded ? Buffer.from(body.body, 'base64').toString('utf8') : body.body;
+          const j = JSON.parse(text);
+          const a = j.aweme_detail || (j.aweme_details || [])[0];
+          if (a && a.aweme_id) awemeCache.set(String(a.aweme_id), a);
+        } catch {}
+      });
+    } catch {}
+    contents.on('will-frame-navigate', (e) => {
+      const u = e.url || '';
+      if (!/^https?:/i.test(u)) e.preventDefault();
+    });
+
+    contents.on('will-navigate', (e, url) => {
+      if (!/^https?:/i.test(String(url))) e.preventDefault();
+    });
+
     contents.setWindowOpenHandler(({ url }) => {
       if (/^https?:/i.test(url) && mainWin) mainWin.webContents.send('open-url', url);
       return { action: 'deny' };

@@ -1,4 +1,4 @@
-﻿/* LoDown：多标签浏览器
+﻿/* LOHANA DX：多标签浏览器
    浏览 = 每个标签一个 webview；历史 = 浏览记录；下载 = 分状态列表；
    支持的站点自动解析，资源面板默认展开、可关闭，起始页不显示。 */
 let S = {
@@ -32,6 +32,18 @@ const icon = (d) => {
   svg.append(p);
   return svg;
 };
+/* 同一页面的不同地址（带追踪参数）视为同一个，避免重复解析 */
+const canonUrl = (u) => {
+  try {
+    const url = new URL(u);
+    for (const k of ['vd_source', 'spm_id_from', 'trackid', 'share_source', 'share_medium', 'unique_k', 'buvid', 'from_source', 'from_spmid', 'timestamp']) {
+      url.searchParams.delete(k);
+    }
+    url.hash = '';
+    return url.origin + url.pathname + (url.search || '');
+  } catch { return u; }
+};
+
 const uid = () => Math.random().toString(36).slice(2, 9);
 const fmtDate = (t) => new Date(t).toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
 
@@ -47,8 +59,74 @@ const normalize = (v) => {
 const active = () => S.tabs.find((t) => t.id === S.activeId) || null;
 
 /* ── 启动 ── */
+/* ── 首次使用须知 / 第三方组件确认 ── */
+async function legalGate() {
+  let st;
+  try { st = await window.api.legalStatus(); } catch { return; }
+
+  if (!st.accepted) {
+    await new Promise((resolve) => {
+      const modal = $('legalModal');
+      const chk = $('legalAgree');
+      const ok = $('legalOk');
+      modal.hidden = false;
+      chk.onchange = () => { ok.disabled = !chk.checked; };
+      ok.onclick = async () => {
+        await window.api.legalAccept('main');
+        modal.hidden = true;
+        resolve();
+      };
+      $('legalQuit').onclick = () => { window.api.winClose(); };
+    });
+  }
+
+  if (!st.components.accepted) {
+    /* 只提示一次；下载是可选的 */
+    openComponentsDialog(true);
+  }
+}
+
+function openComponentsDialog(silent) {
+  const modal = $('compModal');
+  const chk = $('compAgree');
+  const ok = $('compOk');
+  const status = $('compStatus');
+  modal.hidden = false;
+  chk.checked = false;
+  ok.disabled = true;
+  status.textContent = '';
+
+  chk.onchange = () => { ok.disabled = !chk.checked; };
+  $('compCancel').onclick = () => { modal.hidden = true; };
+
+  window.api.onComponentsProgress((d) => {
+    status.textContent = d.stage + (d.pct ? ' ' + d.pct + '%' : '');
+  });
+
+  ok.onclick = async () => {
+    ok.disabled = true;
+    status.textContent = '准备下载…';
+    try {
+      await window.api.legalAccept('components');
+      const r = await window.api.componentsInstall();
+      status.textContent = r && r.ok ? '已安装，可直接解析抖音高清' : '安装失败';
+      setTimeout(() => { modal.hidden = true; }, 800);
+    } catch (err) {
+      status.textContent = '下载失败：' + (err.message || '网络不可用');
+      ok.disabled = false;
+    }
+  };
+}
+
 async function boot() {
+  await legalGate();
   S.boot = await window.api.bootstrap();
+  /* 登录态稍后补，不卡首屏 */
+  window.api.bootstrapLogin().then((r) => {
+    S.boot.login = r.login;
+    S.boot.loginSites = r.loginSites;
+    if (S.view === 'settings') renderPage();
+  }).catch(() => {});
   S.history = await window.api.browseList();
   S.downloads = await window.api.historyList();
 
@@ -131,6 +209,10 @@ async function boot() {
   refreshSites();
 }
 
+function renderSettingsIfOpen() {
+  if (S.view === 'settings') renderPage();
+}
+
 function refreshSites() {
   return window.api.loginSites().then((r) => { S.sites = r.platforms || []; }).catch(() => {});
 }
@@ -167,6 +249,12 @@ function newTab(url) {
   wv.addEventListener('page-favicon-updated', (e) => {
     if (e.favicons && e.favicons[0]) { tab.icon = e.favicons[0]; renderTabs(); }
   });
+  /* 抖音等站点会尝试打开 bytedance:// 这类自定义协议，
+     交给系统会弹出「获取打开此链接的应用」，这里直接拦掉 */
+  wv.addEventListener('will-navigate', (e) => {
+    if (!/^https?:/i.test(e.url || '')) { e.preventDefault(); }
+  });
+
   wv.addEventListener('did-navigate', (e) => onNavigate(tab, e.url));
   wv.addEventListener('did-navigate-in-page', (e) => onNavigate(tab, e.url));
   wv.addEventListener('page-title-updated', () => {
@@ -287,37 +375,22 @@ async function onNavigate(tab, url) {
   } catch { }
 
   if (SUPPORTED.test(url)) {
-    tab.info = null; tab.err = ''; tab.panelOpen = true;
-    clearTimeout(tab.timer);
-    tab.timer = setTimeout(() => parseTab(tab, true), 1200);
-    renderSide();
+    /* 浏览时登录了，就把这套 Cookie 同步给解析/下载引擎 */
+    window.api.syncCookies().catch(() => {});
+    /* 同一地址重复触发（did-navigate / in-page / 标题更新）时不再重来一遍 */
+    if (tab.parseUrl !== url) {
+      tab.parseUrl = url;
+      tab.info = null; tab.err = ''; tab.panelOpen = true;
+      clearTimeout(tab.timer);
+      tab.timer = setTimeout(() => parseTab(tab, true), 1200);
+      renderSide();
+    }
   } else {
     tab.info = null; tab.err = ''; tab.panelOpen = true;
     renderSide();
   }
 }
 
-/* 侧栏占位后，把网页缩放到「刚好完整显示」：
-   先复位到 1 量一次页面真实宽度，再按可用宽度算缩放比。 */
-async function fitZoom(tab) {
-  if (!tab || !tab.wv || !tab.ready) return;
-  const wv = tab.wv;
-  try {
-    const avail = wv.getBoundingClientRect().width;
-    if (!avail) return;
-
-    /* 在当前缩放比例下量一次版面宽度，直接算出目标比例：
-       zoom' = zoom * avail / scrollWidth，全程只改一次缩放，避免闪跳。 */
-    const sw = await wv.executeJavaScript(
-      'Math.max(document.documentElement.scrollWidth, document.body ? document.body.scrollWidth : 0)',
-    );
-    if (!sw || sw < 200) return;
-
-    const cur = wv.getZoomFactor();
-    const next = Math.max(0.5, Math.min(1, (cur * avail) / sw));
-    if (Math.abs(next - cur) > 0.01) wv.setZoomFactor(next);
-  } catch { /* 页面没就绪就跳过 */ }
-}
 
 /* ── 视图 ── */
 function setView(v, keepTab) {
@@ -336,6 +409,25 @@ function setView(v, keepTab) {
 }
 
 /* ── 资源面板 ── */
+function actIcon(paths) {
+  const ns = 'http://www.w3.org/2000/svg';
+  const el = document.createElementNS(ns, 'svg');
+  el.setAttribute('viewBox', '0 0 24 24');
+  el.setAttribute('width', '16');
+  el.setAttribute('height', '16');
+  el.setAttribute('fill', 'none');
+  el.setAttribute('stroke', 'currentColor');
+  el.setAttribute('stroke-width', '1.7');
+  el.setAttribute('stroke-linecap', 'round');
+  el.setAttribute('stroke-linejoin', 'round');
+  for (const d of (Array.isArray(paths) ? paths : [paths])) {
+    const node = document.createElementNS(ns, 'path');
+    node.setAttribute('d', d);
+    el.append(node);
+  }
+  return el;
+}
+
 function imgWithFallback(url, alt, extra) {
   const el = h('img', { src: url, referrerPolicy: 'no-referrer', ...(extra || {}) });
   let stage = 0;
@@ -480,8 +572,22 @@ function renderSide() {
 
   /* 底部固定：下载此页（未解析时按钮变为解析） */
   const foot = h('div', { className: 'sideFoot' });
-  const pageBtn = h('button', {}, info ? '下载此页' : '解析此页');
-  pageBtn.onclick = () => { if (tab.info) startDownload(tab); else parseTab(tab, false); };
+  const pageBtn = h('button', {}, info ? '下载勾选项' : '解析此页');
+  pageBtn.onclick = () => {
+    if (!tab.info) { parseTab(tab, false); return; }
+    const pk = tab.pick || {};
+    /* 纯图集作品默认全选图片，视为已勾选 */
+    const autoImages = (tab.info.images || []).length && !(tab.info.videos || []).length;
+    const hasExtras = autoImages || (pk.coverIds || []).length || pk.avatar || pk.audio || (pk.imageIds || []).length;
+    if (!hasExtras) {
+      const old = pageBtn.textContent;
+      pageBtn.textContent = '请先勾选封面 / 头像 / 音频 / 图片';
+      setTimeout(() => { pageBtn.textContent = old; }, 1600);
+      return;
+    }
+    /* 视频有自己的「下载 xxxP」按钮，这里只下勾选项 */
+    startDownload(tab, { extrasOnly: true });
+  };
   foot.append(pageBtn);
   box.append(foot);
 
@@ -489,7 +595,11 @@ function renderSide() {
 
 /* ── 解析 ── */
 async function parseTab(tab, auto) {
+  try { await window.api.syncCookies(); } catch {}
   const dl = $('download');
+  tab.parseUrl = tab.url;
+  if (tab.parsing) return;
+  tab.parsing = true;
   if (dl && !auto) { dl.disabled = true; dl.textContent = '解析中…'; }
   try {
     let info = null;
@@ -528,6 +638,22 @@ async function parseTab(tab, auto) {
       }
     }
 
+    /* 抖音：优先用浏览时缓存下来的详情接口数据（带签名，含 1080P） */
+    if (!info && /douyin\.com/.test(tab.url || '')) {
+      try {
+        const c = await window.api.douyinCached(tab.url);
+        if (c && c.ok) info = c.info;
+      } catch {}
+    }
+
+    /* 抖音：先用隐藏窗口截获页面自己的详情接口（带登录态与签名） */
+    if (!info && /douyin\.com/.test(tab.url || '')) {
+      try {
+        const cap = await window.api.douyinCapture(tab.url);
+        if (cap && cap.ok) info = cap.info;
+      } catch {}
+    }
+
     if (!info) info = await window.api.probe(tab.url);
 
     tab.info = info;
@@ -543,19 +669,29 @@ async function parseTab(tab, auto) {
     tab.err = e.message || String(e);
     tab.info = null;
   } finally {
-    if (dl) { dl.textContent = '下载此页'; dl.disabled = false; }
+    tab.parsing = false;
   }
   if (tab.id === S.activeId) renderSide();
 }
 
 /* ── 下载 ── */
-async function startDownload(tab) {
+async function startDownload(tab, opts) {
   if (!tab.info) return;
+  if (opts && opts.extrasOnly) {
+    tab.pick.videoQn = null;
+    tab.pick.videoUrl = null;
+    tab.pick.videoIdx = undefined;
+  }
+  const info = tab.info;
+  /* 图文笔记：用户没勾任何图时默认全选，避免下出个空任务 */
+  if (info.images?.length && !(info.videos || []).length && !(tab.pick.imageIds || []).length) {
+    tab.pick.imageIds = info.images.map((x) => x.id);
+  }
   const cur = (tab.info.videos || [])[tab.pick.videoIdx ?? 0];
-  if (cur && (tab.pick.videoQn === null || tab.pick.videoQn === undefined)) tab.pick.videoQn = cur.qn;
+  if (!(opts && opts.extrasOnly) && cur && (tab.pick.videoQn === null || tab.pick.videoQn === undefined)) tab.pick.videoQn = cur.qn;
   const job = await window.api.start({ url: tab.url, info: tab.info, pick: tab.pick });
   S.jobs.unshift({ id: job.id, title: tab.info.title, cover: tab.info.cover, items: job.items || [], at: Date.now(), status: job.status || 'running', url: tab.url });
-  tab.info = null; tab.pick = null;
+  tab.downloadedAt = Date.now();
   setView('downloads');
   poll(S.jobs[0]);
 }
@@ -647,6 +783,14 @@ function renderPage() {
   else if (S.view === 'settings') renderSettings(box);
 }
 
+function fmtBytes(n) {
+  if (!n) return '—';
+  if (n >= 1073741824) return (n / 1073741824).toFixed(2) + ' GB';
+  if (n >= 1048576) return (n / 1048576).toFixed(1) + ' MB';
+  if (n >= 1024) return Math.round(n / 1024) + ' KB';
+  return n + ' B';
+}
+
 function renderDownloads(box) {
   const wrap = h('div', { className: 'pwrap' });
   const counts = { all: S.jobs.length, waiting: 0, running: 0, done: 0, failed: 0 };
@@ -669,21 +813,82 @@ function renderDownloads(box) {
     box.append(wrap);
     return;
   }
+
+  wrap.append(h('div', { className: 'dlhead' },
+    h('span', {}, ''),
+    h('span', {}, '文件名'),
+    h('span', {}, '进度'),
+    h('span', {}, '已下载'),
+    h('span', {}, '文件大小'),
+    h('span', {}, '下载时间'),
+    h('span', {}, '状态'),
+    h('span', {}, '保存地址'),
+    h('span', {}, '操作'),
+  ));
+
   for (const job of list) {
-    const card = h('div', { className: 'card' }, h('div', { className: 'item' },
-      h('span', { className: 'nm', style: 'font-weight:600' }, job.title || job.id),
-      h('span', { className: 'pc', style: 'width:auto;color:var(--sub)' }, fmtDate(job.at || Date.now())),
-    ));
-    for (const it of job.items || []) {
-      const pct = it.total ? Math.round((it.received / it.total) * 100) : (it.status === 'done' ? 100 : 0);
-      card.append(h('div', { className: 'item' },
-        h('span', { className: 'nm', style: 'font-weight:400;color:var(--sub)' }, it.label || it.name || '文件'),
-        h('div', { className: 'pbar' }, Object.assign(h('i'), { style: `width:${pct}%` })),
-        h('span', { className: 'pc' }, it.status === 'done' ? '✓' : pct + '%'),
-      ));
-    }
-    wrap.append(card);
+    const items = (job.items && job.items.length) ? job.items : [{ label: job.title || job.id, status: job.status, file: job.file || null, parts: [] }];
+
+    items.forEach((it, idx) => {
+      const total = (it.parts && it.parts[0] && it.parts[0].total) || 0;
+      const got = (it.parts || []).reduce((a, x) => a + (x.received || 0), 0);
+      const pct = total ? Math.min(100, Math.round((got / total) * 100)) : (it.status === 'done' ? 100 : 0);
+      const stText = it.status === 'done' ? '已完成' : it.status === 'error' ? '失败' : it.status === 'working' ? '下载中' : '等待';
+      const stCls = it.status === 'done' ? 'ok' : it.status === 'error' ? 'bad' : 'run';
+      const dir = it.file ? it.file.replace(/[\\/][^\\/]+$/, '') : '';
+
+      const openBtn = h('button', { className: 'ibtn', title: '查看' }, actIcon([
+          'M2.5 12S6 6 12 6s9.5 6 9.5 6-3.5 6-9.5 6-9.5-6-9.5-6z',
+          'M12 9.2a2.8 2.8 0 1 0 0 5.6 2.8 2.8 0 0 0 0-5.6z',
+        ]));
+      openBtn.onclick = () => { if (it.file) window.api.openFile(it.file); };
+      const locBtn = h('button', { className: 'ibtn', title: '打开文件位置' }, actIcon('M3 8.5A2.5 2.5 0 0 1 5.5 6h3.2l1.9 2h8A2.5 2.5 0 0 1 21 10.5v6A2.5 2.5 0 0 1 18.5 19h-13A2.5 2.5 0 0 1 3 16.5z'));
+      locBtn.onclick = () => { if (it.file) window.api.reveal(it.file); };
+      const delBtn = h('button', { className: 'ibtn danger', title: '删除' }, actIcon([
+          'M4.5 7h15',
+          'M9.5 7V5.2c0-.66.54-1.2 1.2-1.2h2.6c.66 0 1.2.54 1.2 1.2V7',
+          'M6.6 7l.8 11.1c.05.7.63 1.24 1.33 1.24h6.54c.7 0 1.28-.54 1.33-1.24L17.4 7',
+          'M10.2 10.6v5.4M13.8 10.6v5.4',
+        ]));
+      delBtn.onclick = async () => {
+        if (it.file) await window.api.deleteFile(it.file).catch(() => {});
+        if (job.items) job.items = job.items.filter((x) => x !== it);
+        if (!job.items || !job.items.length) {
+          S.jobs = S.jobs.filter((x) => x.id !== job.id);
+          await window.api.historyRemove(job.id).catch(() => {});
+        }
+        renderPage();
+      };
+
+      const row = h('div', { className: 'dlrow' },
+        (() => {
+          const cell = h('span', { className: 'thumb' });
+          const remote = idx === 0 && job.cover ? job.cover : '';
+          if (it.file && /\.(jpg|jpeg|png|webp|gif)$/i.test(it.file)) {
+            const img = h('img', { alt: '' });
+            cell.append(img);
+            window.api.readImage(it.file).then((d) => { if (d) img.src = d; else if (remote) img.src = remote; }).catch(() => { if (remote) img.src = remote; });
+          } else if (remote) {
+            cell.append(imgWithFallback(remote));
+          }
+          return cell;
+        })(),
+        h('span', { className: 'name', title: it.label || job.title }, (it.kind === 'video' ? (job.title || it.label) : (it.label || job.title || '文件'))),
+        h('span', { className: 'prog' },
+          h('span', { className: 'track' }, h('i', { style: 'width:' + pct + '%' })),
+          h('span', { className: 'pct' }, pct + '%'),
+        ),
+        h('span', { className: 'num' }, fmtBytes(got)),
+        h('span', { className: 'num' }, total ? fmtBytes(total) : (it.status === 'done' ? fmtBytes(got) : '—')),
+        h('span', { className: 'time' }, fmtDate(job.at || Date.now())),
+        h('span', { className: 'st ' + stCls }, stText),
+        h('span', { className: 'path', title: it.file || '' }, dir || '—'),
+        h('span', { className: 'acts' }, openBtn, locBtn, delBtn),
+      );
+      wrap.append(row);
+    });
   }
+
   box.append(wrap);
 }
 
@@ -756,8 +961,9 @@ function renderHistory(box) {
 }
 
 function renderSettings(box) {
-  box.append(h('div', { className: 'h1' }, '设置'));
-  box.append(h('div', { className: 'card' },
+  const wrap = h('div', { className: 'pwrap' });
+  wrap.append(h('div', { className: 'h1' }, '设置'));
+  wrap.append(h('div', { className: 'card' },
     h('div', { className: 'kv' }, h('span', { className: 'k' }, '下载目录'),
       h('span', { className: 'v', title: S.boot.outDir }, S.boot.outDir),
       (() => { const b = h('button', { className: 'ghost' }, '更换'); b.onclick = async () => { const r = await window.api.pickDir(); if (r.dir) { S.boot.outDir = r.dir; renderPage(); } }; return b; })(),
@@ -786,12 +992,13 @@ function renderSettings(box) {
     h('span', { className: 'v', style: 'color:var(--sub)' }, S.sessionHint || '未打开登录窗口'),
     finish,
   ));
-  box.append(acc);
+  wrap.append(acc);
 
-  box.append(h('div', { className: 'card' },
+  wrap.append(h('div', { className: 'card' },
     h('div', { className: 'kv' }, h('span', { className: 'k' }, '版本'), h('span', { className: 'v' }, 'v' + S.boot.version)),
     h('div', { className: 'kv' }, h('span', { className: 'k' }, '更新'), h('span', { className: 'v' }, '启动时检查 GitHub Release')),
   ));
+  box.append(wrap);
 }
 
 boot();

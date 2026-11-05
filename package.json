@@ -1,7 +1,7 @@
 {
   "name": "lodown",
   "productName": "LOHANA DX",
-  "version": "0.9.0",
+  "version": "1.0.29",
   "private": true,
   "type": "module",
   "main": "main.cjs",
@@ -11,12 +11,13 @@
     "dist": "node scripts/prepare-ffmpeg.mjs && electron-builder --win"
   },
   "devDependencies": {
+    "@electron/asar": "^4.3.1",
     "electron": "33.2.0",
     "electron-builder": "25.1.8"
   },
   "build": {
     "appId": "com.lohana.media-downloader",
-    "productName": "LoDown",
+    "productName": "LOHANA DX",
     "directories": {
       "output": "dist"
     },
@@ -39,7 +40,7 @@
       "allowToChangeInstallationDirectory": true,
       "perMachine": false,
       "shortcutName": "LOHANA DX",
-      "artifactName": "LoDown-Setup-${version}.${ext}"
+      "artifactName": "LOHANA-DX-Setup-${version}.${ext}"
     },
     "publish": {
       "provider": "github",
@@ -66,5 +67,5 @@
     "electron-updater": "^6.8.11",
     "ws": "^8.22.0"
   },
-  "description": "LoDown：B 站 / 抖音 / 小红书 / YouTube 等多平台下载器"
+  "description": "LOHANA DX：B 站 / 抖音 / 小红书 / YouTube 等多平台下载器"
 }

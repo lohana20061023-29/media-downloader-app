@@ -406,16 +406,34 @@ export async function startXhsDownload(req, { info, onUpdate } = {}) {
         ...((info.images || []).filter((c) => (pick.imageIds || []).includes(c.id))),
       ];
 
+      if (!wanted.length && !(pick.videoUrl || pick.videoQn !== null && pick.videoQn !== undefined)) {
+        const item = { kind: 'image', label: '未选择内容', status: 'error', error: '没有勾选任何图片，也没有可下载的视频', file: null, parts: [] };
+        job.items.push(item); notify();
+      }
+
       for (const c of wanted) {
-        const item = { kind: 'image', label: c.label, status: 'working', file: null, error: null, parts: [] };
+        const item = { kind: 'image', label: c.label, status: 'working', file: null, error: null, parts: [{ name: 'image', received: 0, total: 0 }] };
         job.items.push(item); notify();
         try {
-          const res = await fetch(c.url, { headers: H, signal: controller.signal });
-          if (!res.ok) throw new Error(`HTTP ${res.status}`);
-          const buf = Buffer.from(await res.arrayBuffer());
+          /* 去水印地址失效时回退到原始地址 */
+          const candidates = [c.url, c.alt].filter(Boolean);
+          let buf = null;
+          let lastErr = null;
+          for (const u of candidates) {
+            try {
+              const res = await fetch(u, { headers: H, signal: controller.signal });
+              if (!res.ok) throw new Error('HTTP ' + res.status);
+              buf = Buffer.from(await res.arrayBuffer());
+              if (!buf.length) throw new Error('空文件');
+              break;
+            } catch (err) { lastErr = err; }
+          }
+          if (!buf) throw lastErr || new Error('下载失败');
           const file = join(req.outDir, `${base}_${safe(c.label, 16)}${extOf(buf)}`);
           await writeFile(file, buf);
-          item.file = file; item.status = 'done';
+          item.file = file;
+          item.parts = [{ name: 'image', received: buf.length, total: buf.length }];
+          item.status = 'done';
         } catch (err) {
           item.status = 'error'; item.error = err.message;
         }
