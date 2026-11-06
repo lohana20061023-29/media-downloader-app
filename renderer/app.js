@@ -80,40 +80,53 @@ async function legalGate() {
     });
   }
 
-  if (!st.components.accepted) {
-    /* 只提示一次；下载是可选的 */
-    openComponentsDialog(true);
-  }
+  /* 组件窗在真正解析抖音时再询问 */
 }
 
-function openComponentsDialog(silent) {
+let compBusy = false;
+
+function openComponentsDialog(onDone) {
   const modal = $('compModal');
   const chk = $('compAgree');
   const ok = $('compOk');
   const status = $('compStatus');
+
   modal.hidden = false;
   chk.checked = false;
   ok.disabled = true;
   status.textContent = '';
+  compBusy = false;
 
-  chk.onchange = () => { ok.disabled = !chk.checked; };
+  const sync = () => { ok.disabled = compBusy || !chk.checked; };
+  chk.onchange = sync;
   $('compCancel').onclick = () => { modal.hidden = true; };
 
-  window.api.onComponentsProgress((d) => {
-    status.textContent = d.stage + (d.pct ? ' ' + d.pct + '%' : '');
-  });
+  if (!window.__compProgressBound) {
+    window.api.onComponentsProgress((d) => {
+      const el = $('compStatus');
+      if (el) el.textContent = d.stage + (d.pct ? ' ' + d.pct + '%' : '');
+    });
+    window.__compProgressBound = true;
+  }
 
   ok.onclick = async () => {
-    ok.disabled = true;
+    if (compBusy) return;
+    compBusy = true;
+    sync();
     status.textContent = '准备下载…';
     try {
       await window.api.legalAccept('components');
       const r = await window.api.componentsInstall();
       status.textContent = r && r.ok ? '已安装，可直接解析抖音高清' : '安装失败';
-      setTimeout(() => { modal.hidden = true; }, 800);
+      setTimeout(() => {
+        modal.hidden = true;
+        compBusy = false;
+        if (typeof onDone === 'function') onDone(true);
+      }, 700);
     } catch (err) {
       status.textContent = '下载失败：' + (err.message || '网络不可用');
-      ok.disabled = false;
+      compBusy = false;
+      sync();
     }
   };
 }
@@ -594,9 +607,22 @@ function renderSide() {
 }
 
 /* ── 解析 ── */
+async function componentsReady(tab) {
+  if (!/douyin\.com/.test(tab.url || '')) return true;
+  try {
+    const st = await window.api.legalStatus();
+    if (st.components.installed) return true;
+  } catch { return true; }
+  tab.err = '抖音高清解析需要先下载「解析组件」';
+  renderSide();
+  openComponentsDialog(() => { tab.err = ''; parseTab(tab, true); });
+  return false;
+}
+
 async function parseTab(tab, auto) {
   try { await window.api.syncCookies(); } catch {}
   const dl = $('download');
+  if (!(await componentsReady(tab))) return;
   tab.parseUrl = tab.url;
   if (tab.parsing) return;
   tab.parsing = true;
@@ -970,6 +996,20 @@ function renderSettings(box) {
     ),
     h('div', { className: 'kv' }, h('span', { className: 'k' }, 'ffmpeg'), h('span', { className: 'v' }, S.boot.ffmpeg ? '已内置' : '未找到')),
   ));
+
+  wrap.append(h('div', { className: 'card' },
+    h('div', { className: 'kv' }, h('span', { className: 'k' }, '解析组件'),
+      h('span', { className: 'v', id: 'compState' }, '检查中…'),
+      (() => { const b = h('button', { className: 'ghost' }, '下载 / 重装'); b.onclick = () => openComponentsDialog(() => renderPage()); return b; })(),
+    ),
+  ));
+  setTimeout(async () => {
+    try {
+      const st = await window.api.legalStatus();
+      const el = document.getElementById('compState');
+      if (el) el.textContent = st.components.installed ? '已安装（抖音高清可用）' : '未安装（抖音仅 720P）';
+    } catch {}
+  }, 50);
 
   const acc = h('div', { className: 'card' });
   for (const p of S.sites) {
