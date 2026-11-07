@@ -12,7 +12,7 @@ import { fileURLToPath } from 'node:url';
 import { dirname } from 'node:path';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
-import { createJob, publicJob, imageExtFrom } from './bili.mjs';
+import { createJob, publicJob, imageExtFrom, findFfmpeg } from './bili.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -516,11 +516,28 @@ export async function startDouyinDownload(req, { info, onUpdate } = {}) {
         job.items.push(item); notify();
         try {
           if (img.video) {
-            /* 动图：下载原始视频流，另存为 mp4 */
-            const target = join(req.outDir, `${base}_${safe(img.label, 12)}.mp4`);
+            /* 实况图：先取原始视频流，再用 ffmpeg 转成会动的 WebP */
+            const mp4 = join(req.outDir, `${base}_${safe(img.label, 12)}.mp4`);
             let got = 0;
-            await streamTo([img.video], target, (r) => { got = r; }, controller.signal);
-            item.file = target;
+            await streamTo([img.video], mp4, (r) => { got = r; }, controller.signal);
+
+            let finalFile = mp4;
+            try {
+              const ff = await findFfmpeg('');
+              if (ff) {
+                const webp = join(req.outDir, `${base}_${safe(img.label, 12)}_动图.webp`);
+                await new Promise((resolve, reject) => {
+                  const cp = spawn(ff, ['-y', '-i', mp4, '-vf', 'fps=15,scale=720:-1:flags=lanczos',
+                    '-loop', '0', '-c:v', 'libwebp', '-lossless', '0', '-q:v', '75', webp],
+                  { windowsHide: true });
+                  cp.on('exit', (code) => (code === 0 ? resolve() : reject(new Error('ffmpeg ' + code))));
+                  cp.on('error', reject);
+                });
+                finalFile = webp;
+              }
+            } catch { /* ffmpeg 不可用就保留 mp4 */ }
+
+            item.file = finalFile;
             item.parts = [{ name: 'video', received: got, total: got }];
             item.status = 'done';
             notify();
