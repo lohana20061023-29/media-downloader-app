@@ -1060,7 +1060,6 @@ function renderSettings(box) {
   compCard.append(h('div', { className: 'kv' },
     h('span', { className: 'k' }, '解析组件'),
     h('span', { className: 'v', style: 'color:var(--sub)' }, '内置组件不在此列'),
-    (() => { const b = h('button', { className: 'ghost' }, '安装组件包'); b.onclick = () => openComponentsDialog(() => renderPage()); return b; })(),
   ));
   const compBox = h('div', { id: 'compList' });
   compCard.append(compBox);
@@ -1158,7 +1157,8 @@ async function openInlineLogin(key, label) {
   $('lmTitle').textContent = '登录 · ' + r.label;
   $('lmHint').textContent = '在下方窗口完成登录，然后点「完成登录」';
   const wv = $('lmView');
-  wv.setAttribute('partition', 'persist:login-' + key);
+  /* 用默认会话登录：这样浏览页（同一会话）立刻是登录态，不再需要复制 Cookie */
+  wv.removeAttribute('partition');
   wv.setAttribute('src', r.url);
   $('loginModal').hidden = false;
 }
@@ -1170,6 +1170,10 @@ async function finishInlineLogin() {
   if (!r.ok) { $('lmHint').textContent = '失败：' + r.error; return; }
   $('loginModal').hidden = true;
   S.sessionHint = '已保存 Cookie（' + r.count + ' 条）';
+  try {
+    const t = active();
+    if (t && t.wv && t.url) t.wv.reload();
+  } catch {}
   try { $('lmView').setAttribute('src', 'about:blank'); } catch {}
   await refreshSites();
   renderPage();

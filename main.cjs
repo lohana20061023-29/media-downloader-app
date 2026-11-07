@@ -290,6 +290,37 @@ function normalizeJar(text) {
   return out.join('\n') + '\n';
 }
 
+/* 把 cookies.txt 里的 Cookie 灌进默认会话，解决登录态与浏览页不同步 */
+async function importJarToSession() {
+  try {
+    const fs = require('node:fs');
+    const path = require('node:path');
+    const { session } = require('electron');
+    const jarPath = path.join(require('node:os').homedir(), '.dsh', 'bili-dl', 'cookies.txt');
+    if (!fs.existsSync(jarPath)) return 0;
+    const ses = session.defaultSession;
+    const rows = fs.readFileSync(jarPath, 'utf8').replace(/^\uFEFF/, '').split(/\r?\n/);
+    let n = 0;
+    for (const line of rows) {
+      if (!line || line.startsWith('#')) continue;
+      const c = line.split('\t');
+      if (c.length !== 7 || !c[5] || !c[6]) continue;
+      const host = String(c[0]).replace(/^\./, '');
+      const expires = Number(c[4]);
+      const opt = {
+        url: 'https://' + host + (c[2] || '/'),
+        name: c[5], value: c[6], path: c[2] || '/',
+        secure: c[3] === 'TRUE',
+      };
+      if (Number.isFinite(expires) && expires > 0) opt.expirationDate = expires;
+      const r = await ses.cookies.set(opt).catch(() => null);
+      if (r) n += 1;
+    }
+    await ses.cookies.flushStore().catch(() => {});
+    return n;
+  } catch { return 0; }
+}
+
 async function syncCookiesToJar() {
   try {
     const fs = require('node:fs');
@@ -733,7 +764,8 @@ ipcMain.handle('login-inline-finish', async (_e, key) => {
   const p = e.browserLogin.PLATFORMS[key];
   if (!p) return { ok: false, error: '未知平台' };
 
-  const ses = session.fromPartition('persist:login-' + key);
+  /* 登录窗口现在跑在默认会话里 */
+  const ses = session.defaultSession;
   let fetched = [];
   for (const d of p.domains) {
     try { fetched = fetched.concat(await ses.cookies.get({ domain: d })); } catch {}
@@ -777,13 +809,15 @@ ipcMain.handle('login-inline-finish', async (_e, key) => {
     const ses0 = session.defaultSession;
     for (const c of list) {
       const host = String(c.domain || '').replace(/^\./, '');
-      const url = (c.secure ? 'https://' : 'http://') + host + (c.path || '/');
+      /* 不传 domain，让 Electron 按 url 自己推导，避免 host-only / 域 cookie 冲突 */
+      const url = 'https://' + host + (c.path || '/');
       await ses0.cookies.set({
-        url, name: c.name, value: c.value, domain: c.domain, path: c.path || '/',
-        secure: !!c.secure, httpOnly: !!c.httpOnly, sameSite: c.sameSite || 'unspecified',
+        url, name: c.name, value: c.value, path: c.path || '/',
+        secure: !!c.secure, httpOnly: !!c.httpOnly,
         expirationDate: c.expirationDate,
       }).catch(() => {});
     }
+    await ses0.cookies.flushStore().catch(() => {});
   } catch {}
 
   try { e.browserLogin.cancelLoginSession(); } catch {}
@@ -1060,6 +1094,7 @@ if (!gotLock) {
 app.whenReady().then(async () => {
   try { process.env.LODOWN_COMPONENTS = require('node:path').join(app.getPath('userData'), 'components'); } catch {}
   bootMark('app-ready');
+  try { await importJarToSession(); } catch {}
   loadState();
   createMain();
   createTray();
