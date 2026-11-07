@@ -927,17 +927,23 @@ app.on('web-contents-created', (_event, contents) => {
         } catch {}
       });
     } catch {}
+    /* 有些站点用协议相对地址（//space.bilibili.com/…），补成 https 再判断 */
+    const abs = (u) => (String(u || '').startsWith('//') ? 'https:' + u : String(u || ''));
+
     contents.on('will-frame-navigate', (e) => {
-      const u = e.url || '';
+      const u = abs(e.url);
       if (!/^https?:/i.test(u)) e.preventDefault();
     });
 
     contents.on('will-navigate', (e, url) => {
-      if (!/^https?:/i.test(String(url))) e.preventDefault();
+      const u = abs(url);
+      if (/^https?:/i.test(u)) return;
+      e.preventDefault();
     });
 
     contents.setWindowOpenHandler(({ url }) => {
-      if (/^https?:/i.test(url) && mainWin) mainWin.webContents.send('open-url', url);
+      const target = abs(url);
+      if (/^https?:/i.test(target) && mainWin) mainWin.webContents.send('open-url', target);
       return { action: 'deny' };
     });
   } catch (err) { console.error('window-open 拦截失败', err); }
