@@ -811,9 +811,22 @@ ipcMain.handle('login-inline-finish', async (_e, key) => {
 
   /* 登录窗口现在跑在默认会话里 */
   const ses = session.defaultSession;
+  /* cookies.get({domain}) 只做精确匹配，拿不到 .youtube.com / accounts.google.com 这类，
+     这里改成取全量再按域名后缀筛 */
   let fetched = [];
-  for (const d of p.domains) {
-    try { fetched = fetched.concat(await ses.cookies.get({ domain: d })); } catch {}
+  /* 默认会话 + 历史登录分区都读一遍，避免分区迁移时丢登录态 */
+  const sessList = [ses];
+  for (const k of [...LOGIN_ALLOW, 'pending']) {
+    try { sessList.push(session.fromPartition('persist:login-' + k)); } catch {}
+  }
+  for (const s2 of sessList) {
+    try {
+      const all = await s2.cookies.get({});
+      fetched = fetched.concat(all.filter((c) => {
+        const host = String(c.domain || '').replace(/^\./, '').toLowerCase();
+        return p.domains.some((d) => host === d || host.endsWith('.' + d));
+      }));
+    } catch {}
   }
   const map = new Map();
   for (const c of fetched) map.set(c.domain + '|' + c.name, c);
