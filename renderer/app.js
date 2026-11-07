@@ -1108,18 +1108,30 @@ function renderSettings(box) {
     const meta = SITE_META[p.id] || { name: p.label, icon: '' };
     const av = h('span', { className: 'siteAv' });
     if (meta.icon) { const im = h('img'); im.src = meta.icon; im.onerror = () => { av.textContent = meta.name.slice(0, 1); }; av.append(im); }
+    const stateEl = h('span', { className: 'v', style: p.logged ? 'color:var(--ok);font-weight:600' : 'color:var(--sub)' }, p.logged ? '已登录' : '未登录');
     const out = h('button', { className: 'ghost' }, '退登');
     out.onclick = async () => {
       out.disabled = true; out.textContent = '退出中…';
+      let ok = false;
       try {
         const r = await window.api.logoutPlatform(p.id);
+        ok = !!(r && r.ok);
         if (r.platforms) S.sites = r.platforms;
       } catch {}
-      renderPage();
+      /* 只改这一行，不整页重绘 */
+      if (ok) {
+        stateEl.textContent = '未登录';
+        stateEl.style.color = 'var(--sub)';
+        stateEl.style.fontWeight = '400';
+        out.remove();
+      } else {
+        out.disabled = false;
+        out.textContent = '退登';
+      }
     };
     acc.append(h('div', { className: 'kv' },
       h('span', { className: 'k siteK' }, av, meta.name),
-      h('span', { className: 'v', style: p.logged ? 'color:var(--ok);font-weight:600' : 'color:var(--sub)' }, p.logged ? '已登录' : '未登录'),
+      stateEl,
       p.logged ? out : null,
       login,
     ));

@@ -340,6 +340,14 @@ async function syncCookiesToJar() {
       for (const c of list) {
         const host = String(c.domain || '').replace(/^\./, '');
         if (!COOKIE_HOSTS.some((h) => host === h || host.endsWith('.' + h))) continue;
+        /* 已退登的平台不再同步回来 */
+        const marks = state.logoutAt || {};
+        const blocked = Object.keys(marks).some((k) => {
+          if (Date.now() - marks[k] > 30 * 86400000) return false;
+          const ds = PLATFORM_DOMAINS[k] || [];
+          return ds.some((d) => host === d || host.endsWith('.' + d));
+        });
+        if (blocked) continue;
         collected.push(c);
       }
     }
@@ -372,7 +380,15 @@ async function syncCookiesToJar() {
 
     if (added) {
       fs.mkdirSync(path.dirname(jarPath), { recursive: true });
-      fs.writeFileSync(jarPath, normalizeJar(kept.join('\n')), 'utf8');
+      /* 去重：同一 domain|path|name 只保留最后一条，避免文件无限膨胀 */
+      const seen = new Map();
+      for (const line of kept) {
+        if (!line || line.startsWith('#')) continue;
+        const c = line.split('\t');
+        if (c.length !== 7) continue;
+        seen.set(c[0] + '|' + c[2] + '|' + c[5], line);
+      }
+      fs.writeFileSync(jarPath, normalizeJar([...seen.values()].join('\n')), 'utf8');
     }
     return added;
   } catch { return 0; }
@@ -604,6 +620,19 @@ ipcMain.handle('logout-platform', async (_e, key) => {
   const domains = PLATFORM_DOMAINS[key] || [];
   if (!domains.length) return { ok: false, error: '未知平台' };
 
+  /* 0) 清掉旧版登录分区（persist:login-*）里的同平台数据，否则会被重新同步回 jar */
+  for (const key of LOGIN_ALLOW) {
+    try {
+      const ses = session.fromPartition('persist:login-' + key);
+      const cs = await ses.cookies.get({});
+      for (const c of cs) {
+        const host = String(c.domain || '').replace(/^\./, '');
+        if (!domains.some((d) => host === d || host.endsWith('.' + d))) continue;
+        try { await ses.cookies.remove('https://' + host + (c.path || '/'), c.name); } catch {}
+      }
+    } catch {}
+  }
+
   /* 1) 清默认会话里的 cookie / 存储 */
   try {
     const ses = session.defaultSession;
@@ -621,7 +650,7 @@ ipcMain.handle('logout-platform', async (_e, key) => {
 
   /* 2) 从共享 cookies.txt 里删掉对应行 */
   try {
-    const jar = join(homedir(), '.dsh', 'bili-dl', 'cookies.txt');
+    const jar = require('node:path').join(require('node:os').homedir(), '.dsh', 'bili-dl', 'cookies.txt');
     if (fs.existsSync(jar)) {
       const text = fs.readFileSync(jar, 'utf8');
       const kept = text.split(/\r?\n/).filter((line) => {
@@ -633,9 +662,25 @@ ipcMain.handle('logout-platform', async (_e, key) => {
     }
   } catch {}
 
-  /* 3) 刷新站点状态 */
-  try { syncCookiesToJar(); } catch {}
-  return { ok: true, platforms: await loginSites() };
+  /* 2.5) 记录退登时间，后续自动同步跳过该平台 */
+  try {
+    const marks = state.logoutAt || {};
+    marks[key] = Date.now();
+    saveState({ logoutAt: marks });
+  } catch {}
+
+  /* 3) 重新计算状态（不再把旧 Cookie 同步回来） */
+  try {
+    const e = await loadEngine();
+    let st = {};
+    try { st = await e.browserLogin.detectLogins(); } catch {}
+    const platforms = Object.entries(e.browserLogin.PLATFORMS)
+      .filter(([id]) => LOGIN_ALLOW.includes(id))
+      .map(([id, p2]) => ({ id, label: p2.label, logged: !!st[id] }));
+    return { ok: true, platforms };
+  } catch (err) {
+    return { ok: true, platforms: [] };
+  }
 });
 
 ipcMain.handle('bootstrap', () => {
@@ -803,6 +848,13 @@ ipcMain.handle('login-inline-finish', async (_e, key) => {
   } catch (err) {
     return { ok: false, error: '写入失败：' + err.message };
   }
+
+  /* 重新登录 → 清除该平台的退登标记 */
+  try {
+    const marks = { ...(state.logoutAt || {}) };
+    delete marks[key];
+    saveState({ logoutAt: marks });
+  } catch {}
 
   /* 注入默认会话，让浏览页的 webview 也处于登录态 */
   try {
