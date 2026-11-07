@@ -129,6 +129,23 @@ export async function resolveAwemeId(input) {
  * 以及实况图 images[i].video 的动态流。
  */
 /** 把抖音原始 item 归一化成面板数据结构（分享页 / Web 接口共用） */
+/** 从图片对象里挖出实况视频地址：字段位置随版本变化，逐个兜底 */
+function pickLiveVideo(img) {
+  const v = img?.video || img?.live_photo?.video || {};
+  const cands = [
+    v.play_addr?.url_list?.[0],
+    v.play_addr_h264?.url_list?.[0],
+    v.play_addr_265?.url_list?.[0],
+    v.play_addr_lowbr?.url_list?.[0],
+    v.download_addr?.url_list?.[0],
+    v.download_suffix_logo_addr?.url_list?.[0],
+    (v.bit_rate || []).slice().sort((a, b) => (b.bit_rate || 0) - (a.bit_rate || 0))[0]?.play_addr?.url_list?.[0],
+    img?.video?.url,
+    img?.live_photo_type === 1 ? img?.url_list?.[0] : '',
+  ].filter(Boolean);
+  return cands[0] || '';
+}
+
 export function normalizeAwemeItem(item, id) {
   const br = item?.video?.bit_rate || [];
   const videos = br
@@ -151,13 +168,24 @@ export function normalizeAwemeItem(item, id) {
     .filter(Boolean)
     .sort((x, y) => (y.height || 0) - (x.height || 0));
 
+  /* 诊断：图片都没识别到视频时，把结构写到临时文件 */
+  try {
+    const rawImgs = item?.images || [];
+    if (rawImgs.length && !rawImgs.some((x) => pickLiveVideo(x))) {
+      writeFileSync(join(process.env.TEMP || '.', 'douyin-img-struct.txt'),
+        'keys=' + Object.keys(rawImgs[0]).join(',') +
+        '\nlive_photo_type=' + rawImgs[0].live_photo_type +
+        '\nclip_type=' + rawImgs[0].clip_type +
+        '\nhasVideo=' + !!rawImgs[0].video +
+        '\nvideoKeys=' + (rawImgs[0].video ? Object.keys(rawImgs[0].video).join(',') : ''));
+    }
+  } catch {}
+
   const images = (item?.images || []).map((img, i) => ({
     id: 'img' + (i + 1),
     label: '图 ' + (i + 1),
     url: (img.url_list || [])[0] || (img.download_url_list || [])[0] || '',
-    video: (img.video?.play_addr?.url_list || [])[0]
-      || (img.video?.play_addr_h264?.url_list || [])[0]
-      || (img.video?.download_addr?.url_list || [])[0] || '',
+    video: pickLiveVideo(img),
   })).filter((x) => x.url);
 
   const playList = item?.video?.play_addr?.url_list || [];
