@@ -1034,6 +1034,16 @@ function renderHistory(box) {
   box.append(wrap);
 }
 
+const SITE_META = {
+  bilibili: { name: '哔哩哔哩', icon: 'https://www.bilibili.com/favicon.ico' },
+  douyin: { name: '抖音', icon: 'https://www.douyin.com/favicon.ico' },
+  xiaohongshu: { name: '小红书', icon: 'https://www.xiaohongshu.com/favicon.ico' },
+  youtube: { name: 'YouTube', icon: 'https://www.youtube.com/favicon.ico' },
+  twitter: { name: 'X', icon: 'https://x.com/favicon.ico' },
+  tiktok: { name: 'TikTok', icon: 'https://www.tiktok.com/favicon.ico' },
+  vimeo: { name: 'Vimeo', icon: 'https://vimeo.com/favicon.ico' },
+};
+
 function renderSettings(box) {
   const wrap = h('div', { className: 'pwrap' });
   wrap.append(h('div', { className: 'h1' }, '设置'));
@@ -1045,27 +1055,63 @@ function renderSettings(box) {
     h('div', { className: 'kv' }, h('span', { className: 'k' }, 'ffmpeg'), h('span', { className: 'v' }, S.boot.ffmpeg ? '已内置' : '未找到')),
   ));
 
-  wrap.append(h('div', { className: 'card' },
-    h('div', { className: 'kv' }, h('span', { className: 'k' }, '解析组件'),
-      h('span', { className: 'v', id: 'compState' }, '检查中…'),
-      (() => { const b = h('button', { className: 'ghost' }, '下载 / 重装'); b.onclick = () => openComponentsDialog(() => renderPage()); return b; })(),
-    ),
+  /* 解析组件：逐项列出，可禁用 / 卸载 */
+  const compCard = h('div', { className: 'card' });
+  compCard.append(h('div', { className: 'kv' },
+    h('span', { className: 'k' }, '解析组件'),
+    h('span', { className: 'v', style: 'color:var(--sub)' }, '内置组件不在此列'),
+    (() => { const b = h('button', { className: 'ghost' }, '安装组件包'); b.onclick = () => openComponentsDialog(() => renderPage()); return b; })(),
   ));
-  setTimeout(async () => {
-    try {
-      const st = await window.api.legalStatus();
-      const el = document.getElementById('compState');
-      if (el) el.textContent = st.components.installed ? '已安装（抖音高清可用）' : '未安装（抖音仅 720P）';
-    } catch {}
-  }, 50);
+  const compBox = h('div', { id: 'compList' });
+  compCard.append(compBox);
+  wrap.append(compCard);
+
+  const renderComp = (list) => {
+    compBox.innerHTML = '';
+    for (const c of list) {
+      const stateText = c.installed ? '已安装' : (c.disabled ? '已禁用' : '未安装');
+      const color = c.installed ? 'color:var(--ok);font-weight:600' : (c.disabled ? 'color:#c0392b' : 'color:var(--sub)');
+      const btns = h('span', { className: 'compBtns' });
+      if (c.installed) {
+        const dis = h('button', { className: 'ghost' }, '禁用');
+        dis.onclick = async () => { const r = await window.api.componentsAction({ id: c.id, action: 'disable' }); if (r.list) renderComp(r.list); };
+        const rm = h('button', { className: 'ghost' }, '卸载');
+        rm.onclick = async () => { const r = await window.api.componentsAction({ id: c.id, action: 'remove' }); if (r.list) renderComp(r.list); };
+        btns.append(dis, rm);
+      } else if (c.disabled) {
+        const en = h('button', { className: 'ghost' }, '启用');
+        en.onclick = async () => { const r = await window.api.componentsAction({ id: c.id, action: 'enable' }); if (r.list) renderComp(r.list); };
+        btns.append(en);
+      }
+      compBox.append(h('div', { className: 'kv compRow' },
+        h('span', { className: 'k' }, c.name + ' · ' + c.license),
+        h('span', { className: 'v', style: color }, stateText),
+        btns,
+      ));
+    }
+  };
+  setTimeout(async () => { try { renderComp(await window.api.componentsStatus()); } catch {} }, 50);
 
   const acc = h('div', { className: 'card' });
   for (const p of S.sites) {
     const login = h('button', { className: 'ghost' }, '登录');
     login.onclick = () => openInlineLogin(p.id, p.label);
+    const meta = SITE_META[p.id] || { name: p.label, icon: '' };
+    const av = h('span', { className: 'siteAv' });
+    if (meta.icon) { const im = h('img'); im.src = meta.icon; im.onerror = () => { av.textContent = meta.name.slice(0, 1); }; av.append(im); }
+    const out = h('button', { className: 'ghost' }, '退登');
+    out.onclick = async () => {
+      out.disabled = true; out.textContent = '退出中…';
+      try {
+        const r = await window.api.logoutPlatform(p.id);
+        if (r.platforms) S.sites = r.platforms;
+      } catch {}
+      renderPage();
+    };
     acc.append(h('div', { className: 'kv' },
-      h('span', { className: 'k' }, p.label),
+      h('span', { className: 'k siteK' }, av, meta.name),
       h('span', { className: 'v', style: p.logged ? 'color:var(--ok);font-weight:600' : 'color:var(--sub)' }, p.logged ? '已登录' : '未登录'),
+      p.logged ? out : null,
       login,
     ));
   }

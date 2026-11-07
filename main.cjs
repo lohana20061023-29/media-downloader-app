@@ -434,6 +434,119 @@ ipcMain.handle('components-install', async (event) => {
   send('完成', 100);
   return { ok: true, dir };
 });
+/* ── 解析组件（分项管理） ── */
+const COMPONENTS = [
+  { id: 'python', name: 'Python 3.11 运行时', license: 'PSF License', sub: 'python' },
+  { id: 'sign', name: 'TikTokDownloader 签名实现', license: 'Apache-2.0', sub: 'sign' },
+  { id: 'ytdlp', name: 'yt-dlp 通用解析', license: 'Unlicense', sub: 'ytdlp' },
+];
+
+function compPath(c) {
+  const dir = componentsDir();
+  const base = require('node:path').join(dir, c.sub);
+  if (c.id === 'python') return require('node:path').join(base, 'python.exe');
+  if (c.id === 'sign') return require('node:path').join(base, 'sign.py');
+  return require('node:path').join(base, 'yt-dlp.exe');
+}
+
+function compState(c) {
+  const dir = componentsDir();
+  const on = compPath(c);
+  const off = require('node:path').join(dir, c.sub + '.off');
+  return {
+    id: c.id,
+    name: c.name,
+    license: c.license,
+    installed: existsSync(on),
+    disabled: !existsSync(on) && existsSync(off),
+  };
+}
+
+ipcMain.handle('components-status', () => COMPONENTS.map(compState));
+
+ipcMain.handle('components-action', async (_e, payload) => {
+  const fs = require('node:fs');
+  const path = require('node:path');
+  const id = payload && payload.id;
+  const action = payload && payload.action;
+  const c = COMPONENTS.find((x) => x.id === id);
+  if (!c) return { ok: false, error: '未知组件' };
+
+  const dir = componentsDir();
+  const live = path.join(dir, c.sub);
+  const off = path.join(dir, c.sub + '.off');
+
+  try {
+    if (action === 'disable') {
+      if (fs.existsSync(live)) fs.renameSync(live, off);
+    } else if (action === 'enable') {
+      if (fs.existsSync(off)) fs.renameSync(off, live);
+    } else if (action === 'remove') {
+      for (const d of [live, off]) if (fs.existsSync(d)) fs.rmSync(d, { recursive: true, force: true });
+    } else if (action === 'install') {
+      if (!fs.existsSync(path.join(dir, 'python', 'python.exe')) || !fs.existsSync(path.join(dir, 'sign', 'sign.py'))) {
+        return { ok: false, error: '请先安装「Python 运行时 + 签名实现」组件包' };
+      }
+      if (c.id === 'ytdlp' && !fs.existsSync(path.join(live, 'yt-dlp.exe'))) {
+        return { ok: false, error: 'yt-dlp 暂未提供独立下载' };
+      }
+    }
+    return { ok: true, list: COMPONENTS.map(compState) };
+  } catch (err) {
+    return { ok: false, error: err.message, list: COMPONENTS.map(compState) };
+  }
+});
+
+/* ── 平台退登：清 Cookie 与站点存储 ── */
+const PLATFORM_DOMAINS = {
+  bilibili: ['bilibili.com', 'bilivideo.com', 'biliapi.net', 'hdslb.com', 'biliapi.com'],
+  douyin: ['douyin.com', 'iesdouyin.com', 'douyinpic.com', 'douyinvod.com', 'bytedance.com'],
+  xiaohongshu: ['xiaohongshu.com', 'xhscdn.com', 'xhs.cn'],
+  youtube: ['youtube.com', 'googlevideo.com', 'ytimg.com', 'google.com'],
+  twitter: ['twitter.com', 'x.com', 'twimg.com'],
+  tiktok: ['tiktok.com', 'tiktokcdn.com', 'ttwstatic.com'],
+  vimeo: ['vimeo.com', 'vimeocdn.com'],
+};
+
+ipcMain.handle('logout-platform', async (_e, key) => {
+  const fs = require('node:fs');
+  const domains = PLATFORM_DOMAINS[key] || [];
+  if (!domains.length) return { ok: false, error: '未知平台' };
+
+  /* 1) 清默认会话里的 cookie / 存储 */
+  try {
+    const ses = session.defaultSession;
+    const cookies = await ses.cookies.get({});
+    for (const c of cookies) {
+      if (domains.some((d) => String(c.domain || '').replace(/^\./, '').endsWith(d))) {
+        try { await ses.cookies.remove('https://' + String(c.domain).replace(/^\./, '') + c.path, c.name); } catch {}
+      }
+    }
+    for (const d of domains) {
+      try { await ses.clearStorageData({ origin: 'https://' + d }); } catch {}
+      try { await ses.clearStorageData({ origin: 'https://www.' + d }); } catch {}
+    }
+  } catch {}
+
+  /* 2) 从共享 cookies.txt 里删掉对应行 */
+  try {
+    const jar = join(homedir(), '.dsh', 'bili-dl', 'cookies.txt');
+    if (fs.existsSync(jar)) {
+      const text = fs.readFileSync(jar, 'utf8');
+      const kept = text.split(/\r?\n/).filter((line) => {
+        if (!line || line.startsWith('#')) return true;
+        const domain = String(line.split('\t')[0] || '').replace(/^\./, '');
+        return !domains.some((d) => domain.endsWith(d));
+      });
+      fs.writeFileSync(jar, kept.join('\n'), 'utf8');
+    }
+  } catch {}
+
+  /* 3) 刷新站点状态 */
+  try { syncCookiesToJar(); } catch {}
+  return { ok: true, platforms: await loginSites() };
+});
+
 ipcMain.handle('bootstrap', () => {
   /* 不加载引擎、不发网络请求：只回本地状态，保证首屏秒开 */
   const bundled = bundledFfmpeg();
