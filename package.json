@@ -1,7 +1,7 @@
 {
   "name": "lodown",
   "productName": "LOHANA DX",
-  "version": "1.0.32",
+  "version": "1.0.37",
   "private": true,
   "type": "module",
   "main": "main.cjs",
@@ -53,6 +53,13 @@
         "to": "vendor",
         "filter": [
           "ffmpeg.exe"
+        ]
+      },
+      {
+        "from": "engine/pysign",
+        "to": "app.asar.unpacked/engine/pysign",
+        "filter": [
+          "*.py"
         ]
       }
     ]

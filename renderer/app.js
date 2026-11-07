@@ -664,6 +664,12 @@ async function parseTab(tab, auto) {
       }
     }
 
+    /* 抖音：优先走带签名的 Web 接口（能拿 1080P 与实况图动态流） */
+    if (!info && /douyin\.com/.test(tab.url || '')) {
+      try { info = await window.api.probe(tab.url); } catch {}
+    }
+
+    /* 兜底：浏览缓存 / 隐藏窗口截获 */
     /* 抖音：优先用浏览时缓存下来的详情接口数据（带签名，含 1080P） */
     if (!info && /douyin\.com/.test(tab.url || '')) {
       try {

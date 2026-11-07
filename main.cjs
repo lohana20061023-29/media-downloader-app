@@ -381,24 +381,59 @@ ipcMain.handle('components-install', async (event) => {
   const dir = componentsDir();
   await fs.promises.mkdir(dir, { recursive: true });
   const zipPath = path.join(os.tmpdir(), 'lodown-components-' + COMPONENT_VERSION + '.zip');
-  const url = 'https://github.com/lohana20061023-29/media-downloader-app/releases/download/components-v' + COMPONENT_VERSION + '/lodown-components-' + COMPONENT_VERSION + '.zip';
+
+  const origin = 'https://github.com/lohana20061023-29/media-downloader-app/releases/download/components-v' + COMPONENT_VERSION + '/lodown-components-' + COMPONENT_VERSION + '.zip';
+  /* 国内直连 GitHub 常失败/极慢：镜像优先 */
+  const urls = [
+    ['gh-proxy.com', 'https://gh-proxy.com/' + origin],
+    ['ghfast.top', 'https://ghfast.top/' + origin],
+    ['GitHub', origin],
+  ];
 
   const send = (stage, pct) => { try { event.sender.send('components-progress', { stage, pct }); } catch {} };
 
-  send('下载组件包…', 5);
-  const res = await fetch(url, { redirect: 'follow' });
-  if (!res.ok) throw new Error('组件包下载失败 HTTP ' + res.status);
-  const buf = Buffer.from(await res.arrayBuffer());
-  await fs.promises.writeFile(zipPath, buf);
-  send('解压组件包…', 60);
+  let okFile = false;
+  let lastErr = '';
+  for (const [host, u] of urls) {
+    try {
+      send('连接 ' + host + '…', 3);
+      const ctrl = new AbortController();
+      const timer = setTimeout(() => ctrl.abort(), 240000);
+      const res = await fetch(u, { redirect: 'follow', signal: ctrl.signal });
+      if (!res.ok) throw new Error('HTTP ' + res.status);
 
+      const totalLen = Number(res.headers.get('content-length') || 0);
+      const chunks = [];
+      let got = 0;
+      let lastPct = -1;
+      for await (const chunk of res.body) {
+        chunks.push(chunk);
+        got += chunk.length;
+        if (totalLen) {
+          const pct = Math.min(65, 5 + Math.round((got / totalLen) * 60));
+          if (pct !== lastPct) { lastPct = pct; send('下载组件包 ' + (got / 1048576).toFixed(1) + ' / ' + (totalLen / 1048576).toFixed(1) + ' MB', pct); }
+        }
+      }
+      clearTimeout(timer);
+      const buf = Buffer.concat(chunks);
+      if (buf.length < 1024 * 1024) throw new Error('文件不完整');
+      await fs.promises.writeFile(zipPath, buf);
+      okFile = true;
+      break;
+    } catch (err) {
+      lastErr = err.message;
+    }
+  }
+
+  if (!okFile) throw new Error('组件包下载失败（已尝试镜像）：' + lastErr);
+
+  send('解压组件包…', 75);
   await new Promise((resolve, reject) => {
     execFile('tar', ['-xf', zipPath, '-C', dir], { windowsHide: true }, (err) => (err ? reject(err) : resolve()));
   });
   send('完成', 100);
   return { ok: true, dir };
 });
-
 ipcMain.handle('bootstrap', () => {
   /* 不加载引擎、不发网络请求：只回本地状态，保证首屏秒开 */
   const bundled = bundledFfmpeg();

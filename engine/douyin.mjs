@@ -309,7 +309,7 @@ export async function douyinProbe(input) {
   try {
     const web = await probeWeb(id);
     if (web.videos.length || web.images.length) return web;
-  } catch (err) { try { writeFileSync(join(require('node:os').tmpdir(), 'douyin-web-err.txt'), String(err && err.stack || err)); } catch {} }
+  } catch (err) { try { writeFileSync(join(process.env.TEMP || '.', 'douyin-web-err.txt'), String(err && err.stack || err) + '\nPY=' + pythonExePath() + '\nSIGN=' + signScriptPath()); } catch {} }
 
   const jar = await douyinCookieHeader();
   const shareUrl = `https://www.iesdouyin.com/share/video/${id}/`;
