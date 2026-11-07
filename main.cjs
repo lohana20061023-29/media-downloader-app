@@ -946,6 +946,43 @@ ipcMain.handle('login-poll', async (_e, key) => {
   if (res.state === 'ok' && res.cookie) {
     e.bili.setCookie(res.cookie);
     saveState({ cookie: res.cookie });
+
+    /* 同步登录态：默认会话 + cookies.txt（浏览页与下载共用一份） */
+    try {
+      const fs = require('node:fs');
+      const path = require('node:path');
+      const jarPath = path.join(require('node:os').homedir(), '.dsh', 'bili-dl', 'cookies.txt');
+      const pairs = String(res.cookie).split(';').map((x) => x.trim()).filter(Boolean);
+      const ses = session.defaultSession;
+      const jarRows = [];
+      for (const kv of pairs) {
+        const i = kv.indexOf('=');
+        if (i <= 0) continue;
+        const name = kv.slice(0, i);
+        const value = kv.slice(i + 1);
+        await ses.cookies.set({
+          url: 'https://www.bilibili.com/', name, value, path: '/', secure: true,
+          expirationDate: Math.floor(Date.now() / 1000) + 180 * 86400,
+        }).catch(() => {});
+        jarRows.push(jarLine('bilibili.com', '/', true, Math.floor(Date.now() / 1000) + 180 * 86400, name, value));
+      }
+      await ses.cookies.flushStore().catch(() => {});
+      /* 合并进 cookies.txt */
+      let existing = '';
+      try { existing = fs.readFileSync(jarPath, 'utf8'); } catch {}
+      const kept = existing.split(/\r?\n/).filter((l) => {
+        if (!l || l.startsWith('#')) return false;
+        const domain = String(l.split('\t')[0] || '').replace(/^\./, '');
+        return !(domain === 'bilibili.com' || domain.endsWith('.bilibili.com'));
+      });
+      fs.mkdirSync(path.dirname(jarPath), { recursive: true });
+      fs.writeFileSync(jarPath, normalizeJar([...kept, ...jarRows].join('\n')), 'utf8');
+      /* 清掉退登标记 */
+      const marks = { ...(state.logoutAt || {}) };
+      delete marks.bilibili;
+      saveState({ logoutAt: marks });
+    } catch {}
+
     const me = await e.bili.loginStatus().catch(() => ({}));
     return { state: 'ok', uname: me.uname || '' };
   }

@@ -1104,7 +1104,7 @@ function renderSettings(box) {
   const acc = h('div', { className: 'card' });
   for (const p of S.sites) {
     const login = h('button', { className: 'ghost' }, '登录');
-    login.onclick = () => openInlineLogin(p.id, p.label);
+    login.onclick = () => (p.id === 'bilibili' ? openQrLogin() : openInlineLogin(p.id, p.label));
     const meta = SITE_META[p.id] || { name: p.label, icon: '' };
     const av = h('span', { className: 'siteAv' });
     if (meta.icon) { const im = h('img'); im.src = meta.icon; im.onerror = () => { av.textContent = meta.name.slice(0, 1); }; av.append(im); }
@@ -1159,6 +1159,60 @@ function renderSettings(box) {
 boot();
 
 
+/* ── 扫码登录（哔哩哔哩） ── */
+let qrTimer = null;
+let qrKey = '';
+
+function stopQr() {
+  if (qrTimer) { clearInterval(qrTimer); qrTimer = null; }
+  const m = $('qrModal');
+  if (m) m.hidden = true;
+}
+
+async function loadQr() {
+  const img = $('qrImg');
+  const hint = $('qrHint');
+  hint.className = 'qrHint';
+  hint.textContent = '正在获取二维码…';
+  img.innerHTML = '';
+  try {
+    const r = await window.api.loginQr();
+    qrKey = r.key;
+    img.innerHTML = r.svg;
+    hint.textContent = '请用哔哩哔哩手机客户端扫码';
+  } catch (err) {
+    hint.className = 'qrHint warn';
+    hint.textContent = '获取失败：' + (err.message || '网络错误');
+  }
+}
+
+function openQrLogin() {
+  $('qrModal').hidden = false;
+  $('qrTitle').textContent = '哔哩哔哩 · 扫码登录';
+  loadQr();
+  if (qrTimer) clearInterval(qrTimer);
+  qrTimer = setInterval(async () => {
+    if (!qrKey) return;
+    try {
+      const r = await window.api.loginPoll(qrKey);
+      const hint = $('qrHint');
+      if (r.state === 'waiting') { hint.className = 'qrHint'; hint.textContent = '等待扫码…'; }
+      else if (r.state === 'scanned') { hint.className = 'qrHint'; hint.textContent = '已扫码，请在手机上确认登录'; }
+      else if (r.state === 'expired') {
+        hint.className = 'qrHint warn';
+        hint.textContent = '二维码已过期，点下方刷新';
+        qrKey = '';
+      } else if (r.state === 'ok') {
+        hint.className = 'qrHint ok';
+        hint.textContent = '登录成功';
+        clearInterval(qrTimer); qrTimer = null;
+        await refreshSites();
+        setTimeout(() => { stopQr(); renderPage(); }, 600);
+      }
+    } catch {}
+  }, 2000);
+}
+
 /* ── 内置登录窗口 ───────────────────────────────────── */
 let loginKey = '';
 
@@ -1195,6 +1249,9 @@ function closeInlineLogin() {
   $('loginModal').hidden = true;
   try { $('lmView').setAttribute('src', 'about:blank'); } catch {}
 }
+
+$('qrRefresh').onclick = () => loadQr();
+$('qrClose').onclick = () => stopQr();
 
 $('lmDone').onclick = finishInlineLogin;
 $('lmCancel').onclick = closeInlineLogin;
