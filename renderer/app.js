@@ -211,7 +211,10 @@ async function boot() {
       if (t && t !== tab.title) {
         tab.title = t;
         renderTabs();
-        S.history = await window.api.browseSetTitle({ url: tab.url, title: t, icon: tab.icon || '' });
+        S.history = tab.histAt
+          ? await window.api.browseTitleAt({ at: tab.histAt, title: t, icon: tab.icon || '' })
+          : await window.api.browseSetTitle({ url: tab.histUrl || tab.url, title: t, icon: tab.icon || '' });
+        if (S.view === 'history') renderPage();
       }
     } catch (e) {
       window.api.debugLog('ERR ' + (e && e.message)).catch(() => {});
@@ -270,9 +273,21 @@ function newTab(url) {
 
   wv.addEventListener('did-navigate', (e) => onNavigate(tab, e.url));
   wv.addEventListener('did-navigate-in-page', (e) => onNavigate(tab, e.url));
-  wv.addEventListener('page-title-updated', () => {
-    try { tab.title = wv.getTitle() || tab.title; } catch {}
+  wv.addEventListener('page-title-updated', async () => {
+    let nt = tab.title;
+    try { nt = wv.getTitle() || tab.title; } catch {}
+    if (!nt) return;
+    tab.title = nt;
     renderTabs();
+    /* 标题变了就同步写回历史记录，按时间戳精确定位，避免 URL 匹配不到 */
+    if (nt && nt !== url) {
+      try {
+        S.history = tab.histAt
+          ? await window.api.browseTitleAt({ at: tab.histAt, title: nt, icon: tab.icon || '' })
+          : await window.api.browseSetTitle({ url: tab.histUrl || tab.url, title: nt, icon: tab.icon || '' });
+        if (S.view === 'history') renderPage();
+      } catch {}
+    }
   });
   wv.addEventListener('dom-ready', () => {
     tab.ready = true;
@@ -384,7 +399,10 @@ async function onNavigate(tab, url) {
 
   /* 写浏览记录（标题先用当前拿到的，页面标题定稿后由 page-title-updated 回写） */
   try {
-    S.history = await window.api.browseAdd({ url, title: tab.title || url, icon });
+    const list = await window.api.browseAdd({ url, title: tab.title || url, icon });
+    S.history = list;
+    /* 记住这条记录的写入时间，后面标题 / 图标变化都按它精确更新 */
+    if (Array.isArray(list) && list[0]) { tab.histAt = list[0].at; tab.histUrl = list[0].url; }
   } catch { }
 
   if (SUPPORTED.test(url)) {

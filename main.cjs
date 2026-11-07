@@ -723,6 +723,20 @@ function cleanUrl(u) {
 }
 
 
+ipcMain.handle('browse-title-at', (_e, payload) => {
+  const list = Array.isArray(state.browse) ? state.browse : [];
+  const at = Number(payload && payload.at);
+  const title = payload && payload.title;
+  if (!at || !title) return list;
+  const hit = list.find((x) => x.at === at);
+  if (hit && hit.title !== title) {
+    hit.title = String(title).slice(0, 200);
+    if (payload.icon) hit.icon = payload.icon;
+    saveState({ browse: list });
+  }
+  return list;
+});
+
 ipcMain.handle('browse-set-title', (_e, payload) => {
   const url = payload && payload.url;
   const title = payload && payload.title;
