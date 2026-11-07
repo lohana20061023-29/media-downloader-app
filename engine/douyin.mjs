@@ -218,6 +218,8 @@ const PY_CHILD = { proc: null, buf: '', queue: [] };
 
 function pythonExePath() {
   const cands = [];
+  const compDir = process.env.LODOWN_COMPONENTS || '';
+  if (compDir) cands.push(join(compDir, 'python', 'python.exe'));
   if (process.resourcesPath) cands.push(join(process.resourcesPath, 'vendor', 'python', 'python.exe'));
   cands.push(join(process.cwd(), 'vendor', 'python', 'python.exe'));
   cands.push(join(__dirname, '..', 'vendor', 'python', 'python.exe'));
@@ -227,6 +229,8 @@ function pythonExePath() {
 
 function signScriptPath() {
   const cands = [];
+  const compDir = process.env.LODOWN_COMPONENTS || '';
+  if (compDir) cands.push(join(compDir, 'sign', 'sign.py'));
   if (process.resourcesPath) cands.push(join(process.resourcesPath, 'app.asar.unpacked', 'engine', 'pysign', 'sign.py'));
   cands.push(join(__dirname, 'pysign', 'sign.py'));
   for (const c of cands) { try { if (existsSync(c)) return c; } catch {} }
@@ -603,6 +607,7 @@ export async function startDouyinDownload(req, { info, onUpdate } = {}) {
           }
 
           item.file = finalFile; item.status = 'done';
+          item.parts = [{ name: 'image', received: buf.length, total: buf.length }];
         } catch (err) { item.status = 'error'; item.error = err.message; }
         notify();
       }
