@@ -192,32 +192,43 @@ async function boot() {
   S.titlePoll = setInterval(async () => {
     const tab = active();
     if (!tab || !tab.wv || !tab.ready || S.view !== 'browse') return;
-    try {
-      const code = [
-        '(function(){',
-        "var h=document.querySelector('h1');",
-        'var m=document.querySelector(\'meta[property="og:title"]\');',
-        "return JSON.stringify({u:location.href,t:document.title,h:(h&&h.innerText||'').trim(),o:(m&&m.content)||''});",
-        '})()',
-      ].join('');
-      const raw = await tab.wv.executeJavaScript(code);
-      const info = JSON.parse(raw || '{}');
-      const t = (info.h && info.h.length > 2 && info.h.length < 120) ? info.h : (info.o || info.t || '');
-      const stamp = info.u + '|' + info.t + '|' + info.h + '|' + info.o;
-      if (stamp !== S.lastProbe) {
-        S.lastProbe = stamp;
-        window.api.debugLog('PROBE ' + stamp + ' || tab=' + tab.title).catch(() => {});
+
+    /* 主路径：getTitle() 稳定，不依赖 webview 脚本通道（该通道常报 reply was never sent） */
+    let t = '';
+    try { t = tab.wv.getTitle() || ''; } catch {}
+
+    /* 站点标题不跟随时，尝试 h1 / og:title 兜底（失败就忽略） */
+    if (!t || t === 'about:blank' || /^[a-z0-9.-]+\.[a-z]{2,}$/i.test(t)) {
+      try {
+        const code = [
+          '(function(){',
+          "var h=document.querySelector('h1');",
+          "var m=document.querySelector('meta[property=\"og:title\"]');",
+          "return JSON.stringify({h:(h&&h.innerText||'').trim(),o:(m&&m.content)||'',t:document.title||''});",
+          '})()',
+        ].join('');
+        const raw = await tab.wv.executeJavaScript(code);
+        const info = JSON.parse(raw || '{}');
+        t = (info.h && info.h.length > 2 && info.h.length < 120) ? info.h : (info.o || info.t || t);
+      } catch { /* 通道异常时保持 getTitle 的结果 */ }
+    }
+
+    if (!t) return;
+
+    /* 与历史里存的那条比对，不一致就回写 */
+    if (tab.histAt) {
+      const rec = (S.history || []).find((x) => x.at === tab.histAt);
+      if (!rec || rec.title !== t) {
+        try {
+          S.history = await window.api.browseUpdateAt({ at: tab.histAt, title: t, url: tab.url, icon: tab.icon || '' });
+          if (S.view === 'history') renderPage();
+        } catch {}
       }
-      if (t && t !== tab.title) {
-        tab.title = t;
-        renderTabs();
-        S.history = tab.histAt
-          ? await window.api.browseTitleAt({ at: tab.histAt, title: t, icon: tab.icon || '' })
-          : await window.api.browseSetTitle({ url: tab.histUrl || tab.url, title: t, icon: tab.icon || '' });
-        if (S.view === 'history') renderPage();
-      }
-    } catch (e) {
-      window.api.debugLog('ERR ' + (e && e.message)).catch(() => {});
+    }
+
+    if (t !== tab.title) {
+      tab.title = t;
+      renderTabs();
     }
   }, 1000);
 
@@ -283,7 +294,7 @@ function newTab(url) {
     if (nt && nt !== url) {
       try {
         S.history = tab.histAt
-          ? await window.api.browseTitleAt({ at: tab.histAt, title: nt, icon: tab.icon || '' })
+          ? await window.api.browseUpdateAt({ at: tab.histAt, title: nt, url: tab.url, icon: tab.icon || '' })
           : await window.api.browseSetTitle({ url: tab.histUrl || tab.url, title: nt, icon: tab.icon || '' });
         if (S.view === 'history') renderPage();
       } catch {}
@@ -997,7 +1008,7 @@ function renderHistory(box) {
           onerror: (e) => { e.target.style.visibility = 'hidden'; },
         }),
         h('div', { className: 'ht' },
-          h('div', { className: 'nm' }, it.title || it.url),
+          h('div', { className: 'nm' }, (it.title && it.title !== 'about:blank') ? it.title : (it.url || '')),
           h('div', { className: 'u' }, it.url),
         ),
         h('span', { className: 'tm2' }, stamp),

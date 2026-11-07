@@ -682,11 +682,17 @@ ipcMain.handle('pick-dir', async () => {
 
 /* ── 浏览记录（与下载历史分开）── */
 ipcMain.handle('browse-list', () => Array.isArray(state.browse) ? state.browse : []);
+function cleanTitle(t) {
+  const v = String(t || '').trim();
+  if (!v || v === 'about:blank' || /^[a-z0-9.-]+\.[a-z]{2,}$/i.test(v)) return '';
+  return v.slice(0, 200);
+}
+
 ipcMain.handle('browse-add', (_e, item) => {
   if (!item || !item.url || !/^https?:/i.test(item.url)) return Array.isArray(state.browse) ? state.browse : [];
   const clean = cleanUrl(item.url);
   const list = (Array.isArray(state.browse) ? state.browse : []).filter((x) => cleanUrl(x.url) !== clean);
-  const next = [{ url: cleanUrl(item.url), title: (item.title || item.url).slice(0, 200), icon: item.icon || '', at: Date.now() }, ...list].slice(0, 500);
+  const next = [{ url: cleanUrl(item.url), title: cleanTitle(item.title) || cleanUrl(item.url), icon: item.icon || '', at: Date.now() }, ...list].slice(0, 500);
   saveState({ browse: next });
   return next;
 });
@@ -722,6 +728,20 @@ function cleanUrl(u) {
   } catch { return u; }
 }
 
+
+ipcMain.handle('browse-update-at', (_e, payload) => {
+  const list = Array.isArray(state.browse) ? state.browse : [];
+  const at = Number(payload && payload.at);
+  if (!at) return list;
+  const hit = list.find((x) => x.at === at);
+  if (!hit) return list;
+  let changed = false;
+  if (payload.title && payload.title !== hit.title) { hit.title = String(payload.title).slice(0, 200); changed = true; }
+  if (payload.url && payload.url !== hit.url) { hit.url = String(payload.url); changed = true; }
+  if (payload.icon && payload.icon !== hit.icon) { hit.icon = payload.icon; changed = true; }
+  if (changed) saveState({ browse: list });
+  return list;
+});
 
 ipcMain.handle('browse-title-at', (_e, payload) => {
   const list = Array.isArray(state.browse) ? state.browse : [];
