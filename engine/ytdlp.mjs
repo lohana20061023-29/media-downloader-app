@@ -1,4 +1,4 @@
-/**
+﻿/**
  * yt-dlp 通道 —— 非 B 站站点的下载复用同一套 job / 进度 / 面板数据模型。
  *
  * 只做「公开可下载」的内容：yt-dlp 拿不到 DRM 加密流，这里也不做任何
@@ -12,6 +12,7 @@ import { createJob, publicJob, findFfmpeg, registerImage, getProxy, fetchBytes }
 
 const CANDIDATES = () => [
   process.env.YTDLP_PATH,
+  process.env.LODOWN_COMPONENTS ? join(process.env.LODOWN_COMPONENTS, 'ytdlp', 'yt-dlp.exe') : '',
   join(homedir(), '.dsh', 'bili-dl', 'bin', 'yt-dlp.exe'),
   'D:\\VidBrowser\\resources\\vendor\\bin\\yt-dlp.exe',
   'yt-dlp.exe',
@@ -30,9 +31,33 @@ export function setCookieOpts(next) {
 
 export const getCookieOpts = () => ({ ...cookieOpts });
 
-function cookieArgs() {
+/* 把 cookies.txt 转成 Cookie 头（yt-dlp 的 Netscape 解析器对部分行会直接 AssertionError） */
+function cookieHeaderFromFile(file, url) {
+  try {
+    const text = readFileSync(file, 'utf8').replace(/^\uFEFF/, '');
+    let host = '';
+    try { host = new URL(url).hostname.replace(/^www\./, ''); } catch {}
+    const root = host.split('.').slice(-2).join('.');
+    const parts = [];
+    for (const line of text.split(/\r?\n/)) {
+      if (!line || line.startsWith('#')) continue;
+      const c = line.split('\t');
+      if (c.length !== 7 || !c[5] || !c[6]) continue;
+      const d = String(c[0]).replace(/^\./, '');
+      /* 只带当前站点相关的 cookie，避免超长 Header */
+      if (root && !(d === root || d.endsWith('.' + root) || root.endsWith('.' + d))) continue;
+      parts.push(c[5] + '=' + c[6]);
+    }
+    return parts.join('; ');
+  } catch { return ''; }
+}
+
+function cookieArgs(url) {
   if (cookieOpts.browser) return ['--cookies-from-browser', cookieOpts.browser];
-  if (cookieOpts.file) return ['--cookies', cookieOpts.file];
+  if (cookieOpts.file) {
+    const header = cookieHeaderFromFile(cookieOpts.file, url || '');
+    if (header) return ['--add-header', 'Cookie: ' + header];
+  }
   return [];
 }
 
@@ -105,7 +130,7 @@ export async function ytProbe(url, { hint } = {}) {
   const base = ['-J', '--no-warnings', '--no-playlist', '--no-progress'];
   const proxy = getProxy();
   if (proxy) base.push('--proxy', proxy);
-  base.push(...cookieArgs());
+  base.push(...cookieArgs(url));
   base.push('--', url);
   const { stdout } = await run(exe, base);
   let meta;
@@ -237,7 +262,7 @@ export async function ytStartDownload(req, { info, onUpdate } = {}) {
       if (ffmpeg && (ffmpeg.includes('\\\\') || ffmpeg.includes('/'))) args.push('--ffmpeg-location', dirname(ffmpeg));
       const proxy = getProxy();
       if (proxy) args.push('--proxy', proxy);
-      args.push(...cookieArgs());
+      args.push(...cookieArgs(req.url || info.siteUrl || ""));
 
       if (wantVideo) {
         const h = Number(pick.videoQn);
@@ -285,7 +310,7 @@ export async function ytStartDownload(req, { info, onUpdate } = {}) {
         ];
         if (ffmpeg) aArgs.push('--ffmpeg-location', dirname(ffmpeg));
         if (proxy) aArgs.push('--proxy', proxy);
-        aArgs.push(...cookieArgs());
+        aArgs.push(...cookieArgs(req.url || info.siteUrl || ""));
         if (pick.audioMp3) aArgs.push('-f', 'ba/b', '-x', '--audio-format', 'mp3', '--audio-quality', '0');
         else aArgs.push('-f', 'ba/b');
         aArgs.push('--', req.url);

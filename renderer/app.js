@@ -1082,6 +1082,16 @@ function renderSettings(box) {
         const en = h('button', { className: 'ghost' }, '启用');
         en.onclick = async () => { const r = await window.api.componentsAction({ id: c.id, action: 'enable' }); if (r.list) renderComp(r.list); };
         btns.append(en);
+      } else {
+        const ins = h('button', { className: 'ghost' }, '安装');
+        ins.onclick = async () => {
+          ins.disabled = true;
+          ins.textContent = '安装中…';
+          const r = await window.api.componentsAction({ id: c.id, action: 'install' });
+          if (r.list) renderComp(r.list);
+          else ins.textContent = '安装';
+        };
+        btns.append(ins);
       }
       compBox.append(h('div', { className: 'kv compRow' },
         h('span', { className: 'k' }, c.name + ' · ' + c.license),

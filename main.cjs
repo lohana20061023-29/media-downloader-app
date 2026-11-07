@@ -271,6 +271,25 @@ ipcMain.handle('img-proxy', async (_e, url) => {
    让「浏览用的登录态」和「解析/下载用的登录态」是同一套 */
 const COOKIE_HOSTS = ['bilibili.com', 'douyin.com', 'xiaohongshu.com', 'youtube.com', 'twitter.com', 'x.com', 'tiktok.com'];
 
+/* Netscape 行格式化：yt-dlp 对「.domain + FALSE」这种组合会直接报 invalid Netscape format */
+function jarLine(domain, path, secure, expires, name, value) {
+  const host = String(domain || '').replace(/^\./, '');
+  const clean = (v) => String(v == null ? '' : v).replace(/[\t\r\n]/g, ' ').slice(0, 4000);
+  return [host, 'TRUE', path || '/', secure ? 'TRUE' : 'FALSE', String(expires || 0), clean(name), clean(value)].join('\t');
+}
+
+/* 读入的旧行也顺手规范化，坏的直接丢掉 */
+function normalizeJar(text) {
+  const out = ['# Netscape HTTP Cookie File', '# https://curl.haxx.se/docs/http-cookies.html', ''];
+  for (const line of String(text || '').replace(/^\uFEFF/, '').split(/\r?\n/)) {
+    if (!line || line.startsWith('#')) continue;
+    const c = line.split('\t');
+    if (c.length !== 7 || !c[5] || !c[6] || !c[0]) continue;
+    out.push(jarLine(c[0], c[2], c[3] === 'TRUE', c[4], c[5], c[6]));
+  }
+  return out.join('\n') + '\n';
+}
+
 async function syncCookiesToJar() {
   try {
     const fs = require('node:fs');
@@ -316,13 +335,13 @@ async function syncCookiesToJar() {
       if (existing.has(key)) continue;
       existing.set(key, true);
       const expiry = Math.round(c.expirationDate || (Date.now() / 1000 + 86400));
-      kept.push([domain, c.httpOnly ? 'TRUE' : 'FALSE', c.path || '/', c.secure ? 'TRUE' : 'FALSE', String(expiry), c.name, c.value].join('\t'));
+      kept.push(jarLine(domain, c.path, c.secure, expiry, c.name, c.value));
       added += 1;
     }
 
     if (added) {
       fs.mkdirSync(path.dirname(jarPath), { recursive: true });
-      fs.writeFileSync(jarPath, kept.join('\n') + '\n', 'utf8');
+      fs.writeFileSync(jarPath, normalizeJar(kept.join('\n')), 'utf8');
     }
     return added;
   } catch { return 0; }
@@ -464,9 +483,11 @@ function compState(c) {
 
 ipcMain.handle('components-status', () => COMPONENTS.map(compState));
 
-ipcMain.handle('components-action', async (_e, payload) => {
+ipcMain.handle('components-action', async (event, payload) => {
   const fs = require('node:fs');
   const path = require('node:path');
+  const os = require('node:os');
+  const { execFile } = require('node:child_process');
   const id = payload && payload.id;
   const action = payload && payload.action;
   const c = COMPONENTS.find((x) => x.id === id);
@@ -476,6 +497,25 @@ ipcMain.handle('components-action', async (_e, payload) => {
   const live = path.join(dir, c.sub);
   const off = path.join(dir, c.sub + '.off');
 
+  const send = (stage, pct) => { try { event.sender.send('components-progress', { stage, pct }); } catch {} };
+
+  const grab = async (urls, minSize) => {
+    let lastErr = '';
+    for (const u of urls) {
+      try {
+        const ctrl = new AbortController();
+        const timer = setTimeout(() => ctrl.abort(), 240000);
+        const res = await fetch(u, { redirect: 'follow', signal: ctrl.signal });
+        clearTimeout(timer);
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        const buf = Buffer.from(await res.arrayBuffer());
+        if (buf.length < (minSize || 1024)) throw new Error('内容过小');
+        return buf;
+      } catch (err) { lastErr = err.message; }
+    }
+    throw new Error(lastErr || '下载失败');
+  };
+
   try {
     if (action === 'disable') {
       if (fs.existsSync(live)) fs.renameSync(live, off);
@@ -484,12 +524,32 @@ ipcMain.handle('components-action', async (_e, payload) => {
     } else if (action === 'remove') {
       for (const d of [live, off]) if (fs.existsSync(d)) fs.rmSync(d, { recursive: true, force: true });
     } else if (action === 'install') {
-      if (!fs.existsSync(path.join(dir, 'python', 'python.exe')) || !fs.existsSync(path.join(dir, 'sign', 'sign.py'))) {
-        return { ok: false, error: '请先安装「Python 运行时 + 签名实现」组件包' };
+      const origin = 'https://github.com/lohana20061023-29/media-downloader-app/releases/download/components-v1/lodown-components-1.zip';
+      const mirrors = ['https://gh-proxy.com/' + origin, 'https://ghfast.top/' + origin, origin];
+
+      if (c.id === 'python' || c.id === 'sign') {
+        send('下载组件包…', 5);
+        const buf = await grab(mirrors, 1024 * 1024);
+        const zipPath = path.join(os.tmpdir(), 'lodown-components-1.zip');
+        fs.writeFileSync(zipPath, buf);
+        send('解压…', 70);
+        await new Promise((resolve, reject) => {
+          execFile('tar', ['-xf', zipPath, '-C', dir], { windowsHide: true }, (err) => (err ? reject(err) : resolve()));
+        });
+        if (c.id === 'sign' && !fs.existsSync(path.join(dir, 'sign', 'sign.py'))) {
+          return { ok: false, error: '组件包里没有签名实现', list: COMPONENTS.map(compState) };
+        }
+        if (c.id === 'python' && !fs.existsSync(path.join(dir, 'python', 'python.exe'))) {
+          return { ok: false, error: '组件包里没有 Python 运行时', list: COMPONENTS.map(compState) };
+        }
+      } else if (c.id === 'ytdlp') {
+        send('下载 yt-dlp…', 5);
+        const yt = 'https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp.exe';
+        const buf = await grab(['https://gh-proxy.com/' + yt, 'https://ghfast.top/' + yt, yt], 1024 * 1024);
+        fs.mkdirSync(path.join(dir, 'ytdlp'), { recursive: true });
+        fs.writeFileSync(path.join(dir, 'ytdlp', 'yt-dlp.exe'), buf);
       }
-      if (c.id === 'ytdlp' && !fs.existsSync(path.join(live, 'yt-dlp.exe'))) {
-        return { ok: false, error: 'yt-dlp 暂未提供独立下载' };
-      }
+      send('完成', 100);
     }
     return { ok: true, list: COMPONENTS.map(compState) };
   } catch (err) {
@@ -700,17 +760,31 @@ ipcMain.handle('login-inline-finish', async (_e, key) => {
   const expires = (c) => (c.expirationDate ? Math.floor(c.expirationDate) : Math.floor(Date.now() / 1000) + 365 * 86400);
   for (const c of list) {
     const domain = c.domain.startsWith('.') ? c.domain : '.' + c.domain;
-    rows.push([domain, 'TRUE', '/', c.secure ? 'TRUE' : 'FALSE', expires(c), c.name, c.value].join('\t'));
+    rows.push(jarLine(domain, c.path, c.secure, expires(c), c.name, c.value));
   }
 
   try {
     const path = require('node:path');
     const fs = require('node:fs');
     fs.mkdirSync(path.dirname(e.browserLogin.COOKIE_FILE), { recursive: true });
-    fs.writeFileSync(e.browserLogin.COOKIE_FILE, '# Netscape HTTP Cookie File\n' + rows.join('\n') + '\n', 'utf8');
+    fs.writeFileSync(e.browserLogin.COOKIE_FILE, normalizeJar(rows.join('\n')), 'utf8');
   } catch (err) {
     return { ok: false, error: '写入失败：' + err.message };
   }
+
+  /* 注入默认会话，让浏览页的 webview 也处于登录态 */
+  try {
+    const ses0 = session.defaultSession;
+    for (const c of list) {
+      const host = String(c.domain || '').replace(/^\./, '');
+      const url = (c.secure ? 'https://' : 'http://') + host + (c.path || '/');
+      await ses0.cookies.set({
+        url, name: c.name, value: c.value, domain: c.domain, path: c.path || '/',
+        secure: !!c.secure, httpOnly: !!c.httpOnly, sameSite: c.sameSite || 'unspecified',
+        expirationDate: c.expirationDate,
+      }).catch(() => {});
+    }
+  } catch {}
 
   try { e.browserLogin.cancelLoginSession(); } catch {}
   return { ok: true, count: list.length };
