@@ -9,11 +9,11 @@
  * 兜底：链接里没有 xsec_token 时，开真窗口读桌面版的 noteDetailMap。
  */
 import { spawn, execFile } from 'node:child_process';
-import { existsSync } from 'node:fs';
-import { mkdir, writeFile } from 'node:fs/promises';
+import { existsSync, createWriteStream } from 'node:fs';
+import { mkdir, writeFile, rm } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
-import { createJob, publicJob } from './bili.mjs';
+import { createJob, publicJob, findFfmpeg } from './bili.mjs';
 
 const ROOT = join(homedir(), '.dsh', 'bili-dl');
 const PROFILE = join(ROOT, 'browser-profile');
@@ -127,6 +127,29 @@ async function probeMobile({ id, token }) {
  * 按真实结构取视频流：note.video.media.stream.{h264|h265|h266|av1}[].masterUrl
  * 编码优先级 h264 > h265 > av1 > h266（h264 兼容性最好）。
  */
+/* 简单流式下载：带进度回调，用于实况图视频 */
+async function streamTo(urls, file, onProgress, signal) {
+  let lastErr = null;
+  for (const u of (urls || []).filter(Boolean)) {
+    try {
+      const res = await fetch(u, { headers: H, signal });
+      if (!res.ok || !res.body) throw new Error('HTTP ' + res.status);
+      const total = Number(res.headers.get('content-length') || 0);
+      let got = 0;
+      const out = createWriteStream(file);
+      for await (const chunk of res.body) {
+        got += chunk.length;
+        out.write(chunk);
+        onProgress?.(got, total);
+      }
+      await new Promise((r) => out.end(r));
+      if (!got) throw new Error('空文件');
+      return got;
+    } catch (err) { lastErr = err; }
+  }
+  throw lastErr || new Error('下载失败');
+}
+
 const CODEC_PREF = [['h264', 'H.264'], ['h265', 'H.265'], ['av1', 'AV1'], ['h266', 'H.266']];
 
 function extractVideos(note) {
@@ -223,6 +246,7 @@ function normalize(note, id, wholeState) {
       label: images.length > 1 ? `图 ${i + 1}` : '图片',
       url,
       alt: rawImages[i] || url,
+      video: ((note.imageList || [])[i]?.video?.play_addr?.url_list || [])[0] || '',
     })),
     /* 图文作品的图片已经在 images 里；封面只给视频笔记用，避免重复 */
     covers: videos.length
@@ -412,10 +436,37 @@ export async function startXhsDownload(req, { info, onUpdate } = {}) {
       }
 
       for (const c of wanted) {
-        const item = { kind: 'image', label: c.label, status: 'working', file: null, error: null, parts: [{ name: 'image', received: 0, total: 0 }] };
+        const label = c.video ? c.label + '（动图）' : c.label;
+        const item = { kind: 'image', label, status: 'working', file: null, error: null, parts: [{ name: 'image', received: 0, total: 0 }] };
         job.items.push(item); notify();
         try {
-          /* 去水印地址失效时回退到原始地址 */
+          /* 实况图：先取视频流，再转 GIF */
+          if (c.video) {
+            const mp4 = join(req.outDir, `${base}_${safe(c.label, 16)}.mp4`);
+            let got = 0;
+            await streamTo([c.video], mp4, (r) => { got = r; }, controller.signal);
+            let finalFile = mp4;
+            try {
+              const ff = await findFfmpeg('');
+              if (ff) {
+                const gif = join(req.outDir, `${base}_${safe(c.label, 16)}.gif`);
+                const filt = "fps=15,scale=720:-1:flags=lanczos,split[s0][s1];[s0]palettegen=max_colors=256[p];[s1][p]paletteuse=dither=bayer";
+                await new Promise((resolve, reject) => {
+                  const cp = spawn(ff, ['-y', '-i', mp4, '-vf', filt, '-loop', '0', gif], { windowsHide: true });
+                  cp.on('exit', (code) => (code === 0 ? resolve() : reject(new Error('ffmpeg ' + code))));
+                  cp.on('error', reject);
+                });
+                finalFile = gif;
+              }
+            } catch {}
+            item.file = finalFile;
+            item.parts = [{ name: 'video', received: got, total: got }];
+            item.status = 'done';
+            notify();
+            continue;
+          }
+
+          /* 静态图：去水印地址失效时回退原始地址 */
           const candidates = [c.url, c.alt].filter(Boolean);
           let buf = null;
           let lastErr = null;
@@ -429,9 +480,33 @@ export async function startXhsDownload(req, { info, onUpdate } = {}) {
             } catch (err) { lastErr = err; }
           }
           if (!buf) throw lastErr || new Error('下载失败');
-          const file = join(req.outDir, `${base}_${safe(c.label, 16)}${extOf(buf)}`);
-          await writeFile(file, buf);
-          item.file = file;
+
+          /* 统一转成 PNG */
+          let finalFile = '';
+          let converted = false;
+          try {
+            const ff = await findFfmpeg('');
+            if (ff) {
+              const raw = join(req.outDir, `${base}_${safe(c.label, 16)}_src`);
+              await writeFile(raw, buf);
+              const png = join(req.outDir, `${base}_${safe(c.label, 16)}.png`);
+              await new Promise((resolve, reject) => {
+                const cp = spawn(ff, ['-y', '-i', raw, '-frames:v', '1', png], { windowsHide: true });
+                cp.on('exit', (code) => (code === 0 ? resolve() : reject(new Error('ffmpeg ' + code))));
+                cp.on('error', reject);
+              });
+              await rm(raw, { force: true }).catch(() => {});
+              finalFile = png;
+              converted = true;
+            }
+          } catch {}
+
+          if (!converted) {
+            finalFile = join(req.outDir, `${base}_${safe(c.label, 16)}${extOf(buf)}`);
+            await writeFile(finalFile, buf);
+          }
+
+          item.file = finalFile;
           item.parts = [{ name: 'image', received: buf.length, total: buf.length }];
           item.status = 'done';
         } catch (err) {

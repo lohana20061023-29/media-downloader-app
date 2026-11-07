@@ -516,7 +516,7 @@ export async function startDouyinDownload(req, { info, onUpdate } = {}) {
         job.items.push(item); notify();
         try {
           if (img.video) {
-            /* 实况图：先取原始视频流，再用 ffmpeg 转成会动的 WebP */
+            /* 实况图：先取原始视频流，再转成 GIF */
             const mp4 = join(req.outDir, `${base}_${safe(img.label, 12)}.mp4`);
             let got = 0;
             await streamTo([img.video], mp4, (r) => { got = r; }, controller.signal);
@@ -525,15 +525,14 @@ export async function startDouyinDownload(req, { info, onUpdate } = {}) {
             try {
               const ff = await findFfmpeg('');
               if (ff) {
-                const webp = join(req.outDir, `${base}_${safe(img.label, 12)}_动图.webp`);
+                const gif = join(req.outDir, `${base}_${safe(img.label, 12)}.gif`);
+                const filt = "fps=15,scale=720:-1:flags=lanczos,split[s0][s1];[s0]palettegen=max_colors=256[p];[s1][p]paletteuse=dither=bayer";
                 await new Promise((resolve, reject) => {
-                  const cp = spawn(ff, ['-y', '-i', mp4, '-vf', 'fps=15,scale=720:-1:flags=lanczos',
-                    '-loop', '0', '-c:v', 'libwebp', '-lossless', '0', '-q:v', '75', webp],
-                  { windowsHide: true });
+                  const cp = spawn(ff, ['-y', '-i', mp4, '-vf', filt, '-loop', '0', gif], { windowsHide: true });
                   cp.on('exit', (code) => (code === 0 ? resolve() : reject(new Error('ffmpeg ' + code))));
                   cp.on('error', reject);
                 });
-                finalFile = webp;
+                finalFile = gif;
               }
             } catch { /* ffmpeg 不可用就保留 mp4 */ }
 
@@ -546,12 +545,36 @@ export async function startDouyinDownload(req, { info, onUpdate } = {}) {
           const res = await fetch(img.url, { headers: STREAM_HEADERS, signal: controller.signal });
           if (!res.ok) throw new Error(`HTTP ${res.status}`);
           const buf = Buffer.from(await res.arrayBuffer());
-          const ext = buf.subarray(0, 4).toString() === 'RIFF' ? '.webp'
-            : buf.subarray(1, 4).toString() === 'PNG' ? '.png' : '.jpg';
-          const target = join(req.outDir, `${base}_${safe(img.label, 12)}${ext}`);
-          const { writeFile } = await import('node:fs/promises');
-          await writeFile(target, buf);
-          item.file = target; item.status = 'done';
+          const { writeFile } = await import("node:fs/promises");
+
+          /* 普通图片统一转成 PNG */
+          let finalFile = '';
+          let converted = false;
+          try {
+            const ff = await findFfmpeg('');
+            if (ff) {
+              const raw = join(req.outDir, `${base}_${safe(img.label, 12)}_src`);
+              await writeFile(raw, buf);
+              const png = join(req.outDir, `${base}_${safe(img.label, 12)}.png`);
+              await new Promise((resolve, reject) => {
+                const cp = spawn(ff, ['-y', '-i', raw, '-frames:v', '1', png], { windowsHide: true });
+                cp.on('exit', (code) => (code === 0 ? resolve() : reject(new Error('ffmpeg ' + code))));
+                cp.on('error', reject);
+              });
+              await rm(raw, { force: true }).catch(() => {});
+              finalFile = png;
+              converted = true;
+            }
+          } catch { /* 转换失败走原始格式 */ }
+
+          if (!converted) {
+            const ext = buf.subarray(0, 4).toString() === "RIFF" ? ".webp"
+              : buf.subarray(1, 4).toString() === "PNG" ? ".png" : ".jpg";
+            finalFile = join(req.outDir, `${base}_${safe(img.label, 12)}${ext}`);
+            await writeFile(finalFile, buf);
+          }
+
+          item.file = finalFile; item.status = 'done';
         } catch (err) { item.status = 'error'; item.error = err.message; }
         notify();
       }
