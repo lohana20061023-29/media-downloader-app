@@ -252,16 +252,29 @@ function loadIn(tab, url) {
   else tab.pendingUrl = url;
 }
 function newTab(url) {
+  /* 同一次点击可能同时触发主进程 open-url 和 webview new-window，这里去重 */
+  const target = normalize(url || "");
+  if (target && target !== "about:blank") {
+    const now = Date.now();
+    if (S.lastOpen && S.lastOpen.url === target && now - S.lastOpen.at < 1200) {
+      const exist = S.tabs.find((t) => t.url === target);
+      if (exist) { activate(exist.id); return; }
+    }
+    S.lastOpen = { url: target, at: now };
+    const same = S.tabs.find((t) => t.url === target);
+    if (same) { S.view = "browse"; activate(same.id); return; }
+  }
   const tab = { id: uid(), url: '', title: '新标签页', wv: null, info: null, pick: null, err: '', panelOpen: true };
   const wv = document.createElement('webview');
   wv.className = 'view';
+  wv.setAttribute('allowpopups', '');
   wv.setAttribute('src', 'about:blank');
   /* 页面里点开的链接（target=_blank / window.open）→ 在本应用新标签页打开，不弹独立窗口 */
   wv.addEventListener('new-window', (e) => {
-    if (e.url) {
-      e.preventDefault();
-      if (/^https?:/i.test(e.url)) { S.view = 'browse'; newTab(e.url); }
-    }
+    if (!e.url) return;
+    e.preventDefault();
+    const u = e.url.startsWith('//') ? 'https:' + e.url : e.url;
+    if (/^https?:/i.test(u)) { S.view = 'browse'; newTab(u); }
   });
   wv.addEventListener('did-stop-loading', () => {
     try {
